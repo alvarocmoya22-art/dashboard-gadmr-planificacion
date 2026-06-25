@@ -1,0 +1,9 @@
+{
+  "name": "EPM Rutas de Riobamba",
+  "short_name": "EPM Procesos",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f2f5f3",
+  "theme_color": "#102f3b",
+  "icons": []
+}
