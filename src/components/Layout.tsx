@@ -1,8 +1,9 @@
 import { useState, type ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
-import { Bell, BookOpen, ChartNoAxesCombined, ChevronLeft, FileUp, KanbanSquare, LayoutDashboard, Menu, Moon, Search, Settings2, TableProperties, X } from 'lucide-react'
+import { Bell, BookOpen, ChartNoAxesCombined, ChevronLeft, FileUp, KanbanSquare, LayoutDashboard, LogOut, Menu, Moon, Search, Settings2, TableProperties, X } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { cn } from '../lib/utils'
+import { supabase } from '../lib/supabase'
 
 const nav = [
   { to: '/', label: 'Vista ejecutiva', icon: LayoutDashboard },
@@ -29,6 +30,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const { demoMode, userName, role, canAccessManagement } = useApp()
   const visibleNav = canAccessManagement ? nav : nav.filter((item) => item.to === '/procesos')
   const [title, description] = titles[pathname] ?? ['Detalle del proceso', 'Trazabilidad completa del proceso institucional.']
+  const signOut = async () => { await supabase?.auth.signOut() }
 
   return <div className="app-shell">
     <aside className={cn('sidebar', collapsed && 'sidebar-collapsed', open && 'sidebar-open')}>
@@ -56,6 +58,7 @@ export function Layout({ children }: { children: ReactNode }) {
           <button title="Modo oscuro"><Moon size={19} /></button>
           <button title="Notificaciones" className="notification-button"><Bell size={19} /><i /></button>
           <div className="user-chip"><div className="avatar">AG</div><div><strong>{userName}</strong><small>{role}</small></div></div>
+          {!demoMode && <button title="Cerrar sesión" onClick={signOut} className="logout-button"><LogOut size={18} /><span>Salir</span></button>}
         </div>
       </header>
       <main>

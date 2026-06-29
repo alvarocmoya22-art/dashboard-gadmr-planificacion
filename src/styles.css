@@ -45,6 +45,7 @@ h1,h2,h3 { font-family:'Manrope',sans-serif; }
 .top-actions,.top-actions>div { display:flex;align-items:center;gap:10px; }
 .top-actions>button { border:0;background:transparent;color:#62787d;padding:9px;border-radius:9px; }
 .top-actions>button:hover { background:#eef3f1; }
+.top-actions>.logout-button { display:flex;align-items:center;gap:7px;background:#e8f4f1;color:#116b61;font-weight:800;padding:9px 12px; }
 .notification-button { position:relative; }
 .notification-button i { position:absolute;width:6px;height:6px;background:#e05252;border-radius:50%;right:8px;top:7px;border:1px solid white; }
 .user-chip { border-left:1px solid var(--line);padding-left:16px;margin-left:4px; }
