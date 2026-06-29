@@ -6,11 +6,12 @@ import type { Process } from '../types'
 import { Badge, Button, Input, Select } from './ui'
 import { formatDate } from '../lib/utils'
 import { useApp } from '../store/AppContext'
+import { canEditProcesses } from '../lib/permissions'
 
 const helper = createColumnHelper<Process>()
 
 export function ProcessTable({ onEdit }: { onEdit: (process: Process) => void }) {
-  const { processes, deleteProcess, statuses, areas } = useApp()
+  const { processes, deleteProcess, statuses, areas, role } = useApp()
   const [sorting, setSorting] = useState<SortingState>([])
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
@@ -25,8 +26,8 @@ export function ProcessTable({ onEdit }: { onEdit: (process: Process) => void })
     helper.accessor((row) => row.prioridad?.nombre ?? '', { id: 'prioridad', header: 'Prioridad', cell: ({ row, getValue }) => <Badge color={row.original.prioridad?.color}>{getValue()}</Badge> }),
     helper.accessor('porcentaje_avance', { header: 'Avance', cell: (info) => <div className="progress-cell"><div><i style={{ width: `${info.getValue()}%` }} /></div><span>{info.getValue()}%</span></div> }),
     helper.accessor('fecha_fin_programada', { header: 'Vencimiento', cell: ({ row, getValue }) => <div className="date-cell"><span className={`traffic traffic-${row.original.semaforo?.toLowerCase()}`} />{formatDate(getValue())}</div> }),
-    helper.display({ id: 'actions', cell: ({ row }) => <div className="row-actions"><button onClick={() => onEdit(row.original)} title="Editar"><Pencil size={16} /></button><button onClick={() => confirm('¿Archivar este proceso?') && void deleteProcess(row.original.id)} title="Archivar"><Trash2 size={16} /></button><button title="Más acciones"><MoreHorizontal size={17} /></button></div> }),
-  ], [navigate, onEdit, deleteProcess])
+    helper.display({ id: 'actions', cell: ({ row }) => <div className="row-actions">{canEditProcesses(role) && <button onClick={() => onEdit(row.original)} title="Editar"><Pencil size={16} /></button>}{role === 'admin' && <button onClick={() => confirm('?Archivar este proceso?') && void deleteProcess(row.original.id)} title="Archivar"><Trash2 size={16} /></button>}<button title="M?s acciones"><MoreHorizontal size={17} /></button></div> }),
+  ], [navigate, onEdit, deleteProcess, role])
   const table = useReactTable({
     data: filtered, columns, state: { sorting, globalFilter: search },
     onSortingChange: setSorting, onGlobalFilterChange: setSearch,

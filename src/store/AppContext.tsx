@@ -16,6 +16,8 @@ interface AppState {
   demoMode: boolean
   role: Role
   userName: string
+  userAreaName: string
+  canAccessManagement: boolean
   saveProcess: (data: ProcessFormData, current?: Process) => Promise<void>
   deleteProcess: (id: string) => Promise<void>
   importProcesses: (rows: ProcessFormData[]) => Promise<number>
@@ -45,6 +47,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [role, setRole] = useState<Role>('admin')
   const [userName, setUserName] = useState(isSupabaseConfigured ? 'Usuario institucional' : 'Administrador demo')
+  const [userAreaId, setUserAreaId] = useState<string | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -57,9 +60,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       const { data: authData } = await supabase.auth.getUser()
       if (authData.user) {
-        const { data: profile } = await supabase.from('profiles').select('nombre_completo, role').eq('id', authData.user.id).single()
+        const { data: profile } = await supabase.from('profiles').select('nombre_completo, role, area_id').eq('id', authData.user.id).single()
         setUserName(profile?.nombre_completo || authData.user.email || 'Usuario institucional')
         if (profile?.role) setRole(profile.role as Role)
+        if (profile?.area_id) setUserAreaId(profile.area_id)
       }
       const [areaResult, typeResult, statusResult, priorityResult] = await Promise.all([
         supabase.from('areas').select('*').eq('activo', true).order('nombre'),
@@ -154,10 +158,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
     toast.success('Catálogo actualizado')
   }
 
+  const userAreaName = areas.find((item) => item.id === userAreaId)?.nombre ?? ''
+  const canAccessManagement = role === 'admin' || role === 'gerente' || userAreaName.trim().toLowerCase() === 'gerencia general'
+
   const value = useMemo(() => ({
     processes, areas, processTypes, statuses, priorities, logs, loading,
-    demoMode: !isSupabaseConfigured, role, userName, saveProcess, deleteProcess, importProcesses, addCatalogItem,
-  }), [processes, areas, processTypes, statuses, priorities, logs, loading])
+    demoMode: !isSupabaseConfigured, role, userName, userAreaName, canAccessManagement,
+    saveProcess, deleteProcess, importProcesses, addCatalogItem,
+  }), [processes, areas, processTypes, statuses, priorities, logs, loading, role, userName, userAreaName, canAccessManagement])
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
 }

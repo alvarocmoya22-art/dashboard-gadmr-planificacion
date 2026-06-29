@@ -26,19 +26,20 @@ export function Layout({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false)
   const [collapsed, setCollapsed] = useState(false)
   const { pathname } = useLocation()
-  const { demoMode, userName, role } = useApp()
+  const { demoMode, userName, role, canAccessManagement } = useApp()
+  const visibleNav = canAccessManagement ? nav : nav.filter((item) => item.to === '/procesos')
   const [title, description] = titles[pathname] ?? ['Detalle del proceso', 'Trazabilidad completa del proceso institucional.']
 
   return <div className="app-shell">
     <aside className={cn('sidebar', collapsed && 'sidebar-collapsed', open && 'sidebar-open')}>
       <div className="brand">
-        <div className="brand-mark"><span>R</span><i /></div>
+        <div className="brand-mark"><img src="/rdr-icon.png" alt="EP Rutas de Riobamba" /></div>
         {!collapsed && <div><strong>Rutas de Riobamba</strong><small>Empresa Pública de Movilidad</small></div>}
         <button className="mobile-close" onClick={() => setOpen(false)}><X size={20} /></button>
       </div>
       <nav>
         <p className="nav-label">{collapsed ? '•••' : 'Navegación'}</p>
-        {nav.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} end={to === '/'} onClick={() => setOpen(false)} className={({ isActive }) => cn('nav-item', isActive && 'active')}>
+        {visibleNav.map(({ to, label, icon: Icon }) => <NavLink key={to} to={to} end={to === '/'} onClick={() => setOpen(false)} className={({ isActive }) => cn('nav-item', isActive && 'active')}>
           <Icon size={19} /><span>{label}</span>
         </NavLink>)}
       </nav>

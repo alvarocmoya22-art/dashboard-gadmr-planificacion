@@ -3,6 +3,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { X } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button, Field, Input, Select, Textarea } from './ui'
 import { useApp } from '../store/AppContext'
 import type { Process, ProcessFormData } from '../types'
@@ -65,18 +66,23 @@ export function ProcessForm({ process, onClose }: { process?: Process; onClose: 
     onClose()
   }
 
+  function showValidationHelp() {
+    toast.error('Faltan campos obligatorios. Revisa área, tipo, nombre, responsable y fecha fin programada.')
+    document.querySelector('.modal-panel')?.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
   return <div className="modal-backdrop" role="dialog" aria-modal="true">
     <div className="modal-panel">
       <div className="modal-header"><div><p className="eyebrow">Registro institucional</p><h2>{process ? 'Editar proceso' : 'Nuevo proceso'}</h2></div><button onClick={onClose}><X /></button></div>
-      <form onSubmit={form.handleSubmit(submit)}>
+      <form onSubmit={form.handleSubmit(submit, showValidationHelp)}>
         <div className="form-grid">
-          <Field label="Área responsable" error={form.formState.errors.area_id?.message}><Select {...form.register('area_id')}><option value="">Seleccionar…</option>{areas.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}</Select></Field>
-          <Field label="Tipo de proceso" error={form.formState.errors.tipo_proceso_id?.message}><Select {...form.register('tipo_proceso_id')}><option value="">Seleccionar…</option>{processTypes.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}</Select></Field>
-          <Field label="Nombre del proceso" className="span-2" error={form.formState.errors.nombre_proceso?.message}><Input {...form.register('nombre_proceso')} /></Field>
-          <Field label="Responsable principal" error={form.formState.errors.responsable_principal?.message}><Input {...form.register('responsable_principal')} /></Field>
+          <Field label="Área responsable *" error={form.formState.errors.area_id?.message}><Select {...form.register('area_id')}><option value="">Seleccionar…</option>{areas.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}</Select></Field>
+          <Field label="Tipo de proceso *" error={form.formState.errors.tipo_proceso_id?.message}><Select {...form.register('tipo_proceso_id')}><option value="">Seleccionar…</option>{processTypes.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}</Select></Field>
+          <Field label="Nombre del proceso *" className="span-2" error={form.formState.errors.nombre_proceso?.message}><Input {...form.register('nombre_proceso')} /></Field>
+          <Field label="Responsable principal *" error={form.formState.errors.responsable_principal?.message}><Input {...form.register('responsable_principal')} /></Field>
           <Field label="Responsable secundario"><Input {...form.register('responsable_secundario')} /></Field>
-          <Field label="Fecha inicio" error={form.formState.errors.fecha_inicio?.message}><Input type="date" {...form.register('fecha_inicio')} /></Field>
-          <Field label="Fecha fin programada" error={form.formState.errors.fecha_fin_programada?.message}><Input type="date" {...form.register('fecha_fin_programada')} /></Field>
+          <Field label="Fecha inicio *" error={form.formState.errors.fecha_inicio?.message}><Input type="date" {...form.register('fecha_inicio')} /></Field>
+          <Field label="Fecha fin programada *" error={form.formState.errors.fecha_fin_programada?.message}><Input type="date" {...form.register('fecha_fin_programada')} /></Field>
           <Field label="Fecha fin real"><Input type="date" {...form.register('fecha_fin_real')} /></Field>
           <Field label="Próxima revisión"><Input type="date" {...form.register('fecha_proxima_revision')} /></Field>
           <Field label="Estado" error={form.formState.errors.estado_id?.message}><Select {...form.register('estado_id')}><option value="">Seleccionar…</option>{statuses.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}</Select></Field>
