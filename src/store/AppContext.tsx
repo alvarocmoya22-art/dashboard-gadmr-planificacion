@@ -101,11 +101,26 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   async function saveProcess(data: ProcessFormData, current?: Process) {
     if (supabase) {
-      const payload = { ...data, updated_at: new Date().toISOString() }
+      const payload = {
+        ...data,
+        responsable_secundario: data.responsable_secundario || null,
+        fecha_fin_real: data.fecha_fin_real || null,
+        dependencia_externa: data.dependencia_externa || null,
+        documento_respaldo: data.documento_respaldo || null,
+        proxima_accion: data.proxima_accion || null,
+        objetivo: data.objetivo || null,
+        observaciones: data.observaciones || null,
+        fecha_proxima_revision: data.fecha_proxima_revision || null,
+        updated_at: new Date().toISOString(),
+      }
       const response = current
-        ? await supabase.from('processes').update(payload).eq('id', current.id)
-        : await supabase.from('processes').insert(payload)
+        ? await supabase.from('processes').update(payload).eq('id', current.id).select('*, area:areas(*), tipo:process_types(*), estado:process_statuses(*), prioridad:priorities(*)').single()
+        : await supabase.from('processes').insert(payload).select('*, area:areas(*), tipo:process_types(*), estado:process_statuses(*), prioridad:priorities(*)').single()
       if (response.error) throw response.error
+      if (response.data) {
+        const full = deriveProcess(response.data)
+        setProcesses((old) => current ? old.map((item) => item.id === current.id ? full : item) : [full, ...old])
+      }
       toast.success(current ? 'Proceso actualizado' : 'Proceso creado')
       return
     }

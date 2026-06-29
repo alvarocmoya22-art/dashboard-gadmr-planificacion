@@ -61,9 +61,13 @@ export function ProcessForm({ process, onClose }: { process?: Process; onClose: 
   }, [progress])
 
   async function submit(data: ProcessFormData) {
-    if (finalStatus && data.estado_id === finalStatus.id && !data.fecha_fin_real) data.fecha_fin_real = todayIso()
-    await saveProcess(data, process)
-    onClose()
+    try {
+      if (finalStatus && data.estado_id === finalStatus.id && !data.fecha_fin_real) data.fecha_fin_real = todayIso()
+      await saveProcess(data, process)
+      onClose()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'No se pudo guardar el proceso.')
+    }
   }
 
   function showValidationHelp() {
