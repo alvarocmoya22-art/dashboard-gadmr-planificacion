@@ -16,6 +16,7 @@ interface AppState {
   demoMode: boolean
   role: Role
   userName: string
+  userEmail: string
   userAreaName: string
   canAccessManagement: boolean
   saveProcess: (data: ProcessFormData, current?: Process) => Promise<void>
@@ -47,6 +48,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [role, setRole] = useState<Role>('admin')
   const [userName, setUserName] = useState(isSupabaseConfigured ? 'Usuario institucional' : 'Administrador demo')
+  const [userEmail, setUserEmail] = useState('')
   const [userAreaId, setUserAreaId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -61,6 +63,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const { data: authData } = await supabase.auth.getUser()
       if (authData.user) {
         const { data: profile } = await supabase.from('profiles').select('nombre_completo, role, area_id').eq('id', authData.user.id).single()
+        setUserEmail(authData.user.email ?? '')
         setUserName(profile?.nombre_completo || authData.user.email || 'Usuario institucional')
         if (profile?.role) setRole(profile.role as Role)
         if (profile?.area_id) setUserAreaId(profile.area_id)
@@ -178,9 +181,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(() => ({
     processes, areas, processTypes, statuses, priorities, logs, loading,
-    demoMode: !isSupabaseConfigured, role, userName, userAreaName, canAccessManagement,
+    demoMode: !isSupabaseConfigured, role, userName, userEmail, userAreaName, canAccessManagement,
     saveProcess, deleteProcess, importProcesses, addCatalogItem,
-  }), [processes, areas, processTypes, statuses, priorities, logs, loading, role, userName, userAreaName, canAccessManagement])
+  }), [processes, areas, processTypes, statuses, priorities, logs, loading, role, userName, userEmail, userAreaName, canAccessManagement])
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
 }
