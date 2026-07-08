@@ -23,6 +23,10 @@ const schema = z.object({
   porcentaje_avance: z.number().min(0).max(100),
   dependencia_externa: z.string().optional(),
   documento_respaldo: z.string().optional(),
+  egob_numero: z.string().optional(),
+  egob_url: z.string().optional(),
+  egob_estado: z.string().optional(),
+  egob_ultimo_movimiento: z.string().optional(),
   proxima_accion: z.string().optional(),
   objetivo: z.string().optional(),
   observaciones: z.string().optional(),
@@ -45,6 +49,8 @@ export function ProcessForm({ process, onClose }: { process?: Process; onClose: 
       estado_id: process?.estado_id ?? statuses[0]?.id ?? '', prioridad_id: process?.prioridad_id ?? priorities[1]?.id ?? '',
       porcentaje_avance: process?.porcentaje_avance ?? 0, dependencia_externa: process?.dependencia_externa ?? '',
       documento_respaldo: process?.documento_respaldo ?? '', proxima_accion: process?.proxima_accion ?? '',
+      egob_numero: process?.egob_numero ?? '', egob_url: process?.egob_url ?? '',
+      egob_estado: process?.egob_estado ?? '', egob_ultimo_movimiento: process?.egob_ultimo_movimiento ?? '',
       objetivo: process?.objetivo ?? '', observaciones: process?.observaciones ?? '',
       fecha_proxima_revision: process?.fecha_proxima_revision ?? '', requiere_accion_gerencial: process?.requiere_accion_gerencial ?? false,
       confidencialidad: process?.confidencialidad ?? 'Interna',
@@ -94,6 +100,10 @@ export function ProcessForm({ process, onClose }: { process?: Process; onClose: 
           <Field label={`Avance · ${progress}%`} className="span-2" error={form.formState.errors.porcentaje_avance?.message}><Input type="range" min="0" max="100" {...form.register('porcentaje_avance', { valueAsNumber: true })} /></Field>
           <Field label="Dependencia externa"><Input {...form.register('dependencia_externa')} /></Field>
           <Field label="Documento respaldo / URL"><Input {...form.register('documento_respaldo')} /></Field>
+          <Field label="Nro. trámite eGob / eDoc"><Input placeholder="Ej. 970395" {...form.register('egob_numero')} /></Field>
+          <Field label="URL eGob / eDoc"><Input placeholder="https://egobedoc.gadmriobamba.gob.ec:8081/issues/970395" {...form.register('egob_url')} /></Field>
+          <Field label="Estado eGob"><Input placeholder="Ej. Nuevo, Reasignado, Archivado" {...form.register('egob_estado')} /></Field>
+          <Field label="Último movimiento eGob"><Input placeholder="Ej. 2026-06-08 16:04" {...form.register('egob_ultimo_movimiento')} /></Field>
           <Field label="Próxima acción" className="span-2"><Textarea {...form.register('proxima_accion')} /></Field>
           <Field label="Objetivo" className="span-2"><Textarea {...form.register('objetivo')} /></Field>
           <Field label="Observaciones" className="span-2"><Textarea {...form.register('observaciones')} /></Field>

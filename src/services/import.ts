@@ -18,15 +18,29 @@ export async function parseProcessWorkbook(file: File, catalogs: CatalogContext)
     const status = normalizeStatus(row.Estado)
     const priority = normalizeText(row.Prioridad)
     const item: ProcessFormData = {
-      area_id: findId(catalogs.areas, area), tipo_proceso_id: findId(catalogs.processTypes, type),
-      nombre_proceso: normalizeText(row['Nombre del Proceso']), responsable_principal: normalizeText(row['Responsable Principal']),
-      responsable_secundario: normalizeText(row['Responsable Secundario']), fecha_inicio: excelDateToIso(row['Fecha Inicio']),
-      fecha_fin_programada: excelDateToIso(row['Fecha Fin Programada']), fecha_fin_real: excelDateToIso(row['Fecha Fin Real']),
-      estado_id: findId(catalogs.statuses, status), prioridad_id: findId(catalogs.priorities, priority),
-      porcentaje_avance: normalizeProgress(row['% Avance']), dependencia_externa: normalizeText(row['Dependencia Externa']),
-      documento_respaldo: normalizeText(row['Documento Respaldo']), proxima_accion: normalizeText(row['Próxima Acción']),
-      objetivo: normalizeText(row.Objetivo), observaciones: normalizeText(row.Observaciones),
-      fecha_proxima_revision: '', requiere_accion_gerencial: false, confidencialidad: 'Interna',
+      area_id: findId(catalogs.areas, area),
+      tipo_proceso_id: findId(catalogs.processTypes, type),
+      nombre_proceso: normalizeText(row['Nombre del Proceso']),
+      responsable_principal: normalizeText(row['Responsable Principal']),
+      responsable_secundario: normalizeText(row['Responsable Secundario']),
+      fecha_inicio: excelDateToIso(row['Fecha Inicio']),
+      fecha_fin_programada: excelDateToIso(row['Fecha Fin Programada']),
+      fecha_fin_real: excelDateToIso(row['Fecha Fin Real']),
+      estado_id: findId(catalogs.statuses, status),
+      prioridad_id: findId(catalogs.priorities, priority),
+      porcentaje_avance: normalizeProgress(row['% Avance']),
+      dependencia_externa: normalizeText(row['Dependencia Externa']),
+      documento_respaldo: normalizeText(row['Documento Respaldo']),
+      egob_numero: normalizeText(row['Nro. eGob'] ?? row['Trámite eGob'] ?? row['Nro. trámite eGob']),
+      egob_url: normalizeText(row['URL eGob']),
+      egob_estado: normalizeText(row['Estado eGob']),
+      egob_ultimo_movimiento: normalizeText(row['Último movimiento eGob']),
+      proxima_accion: normalizeText(row['Próxima Acción']),
+      objetivo: normalizeText(row.Objetivo),
+      observaciones: normalizeText(row.Observaciones),
+      fecha_proxima_revision: '',
+      requiere_accion_gerencial: false,
+      confidencialidad: 'Interna',
     }
     const issues: string[] = []
     if (!item.nombre_proceso) issues.push('nombre')

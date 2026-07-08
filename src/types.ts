@@ -25,6 +25,10 @@ export interface Process {
   porcentaje_avance: number
   dependencia_externa?: string
   documento_respaldo?: string
+  egob_numero?: string
+  egob_url?: string
+  egob_estado?: string
+  egob_ultimo_movimiento?: string
   proxima_accion?: string
   objetivo?: string
   observaciones?: string
@@ -66,6 +70,10 @@ export interface ProcessFormData {
   porcentaje_avance: number
   dependencia_externa?: string
   documento_respaldo?: string
+  egob_numero?: string
+  egob_url?: string
+  egob_estado?: string
+  egob_ultimo_movimiento?: string
   proxima_accion?: string
   objetivo?: string
   observaciones?: string

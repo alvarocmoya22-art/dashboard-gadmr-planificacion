@@ -1,12 +1,13 @@
 ﻿import { useMemo, useState } from 'react'
 import { createColumnHelper, flexRender, getCoreRowModel, getFilteredRowModel, getSortedRowModel, useReactTable, type SortingState } from '@tanstack/react-table'
-import { ArrowUpDown, MoreHorizontal, Pencil, Search, Trash2 } from 'lucide-react'
+import { ArrowUpDown, ExternalLink, MoreHorizontal, Pencil, Search, Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import type { Process } from '../types'
 import { Badge, Button, Input, Select } from './ui'
 import { formatDate } from '../lib/utils'
 import { useApp } from '../store/AppContext'
 import { canEditProcesses } from '../lib/permissions'
+import { getEgobIssueNumber, getEgobIssueUrl } from '../lib/egob'
 
 const helper = createColumnHelper<Process>()
 
@@ -26,6 +27,11 @@ export function ProcessTable({ onEdit }: { onEdit: (process: Process) => void })
     helper.accessor((row) => row.prioridad?.nombre ?? '', { id: 'prioridad', header: 'Prioridad', cell: ({ row, getValue }) => <Badge color={row.original.prioridad?.color}>{getValue()}</Badge> }),
     helper.accessor('porcentaje_avance', { header: 'Avance', cell: (info) => <div className="progress-cell"><div><i style={{ width: `${info.getValue()}%` }} /></div><span>{info.getValue()}%</span></div> }),
     helper.accessor('fecha_fin_programada', { header: 'Vencimiento', cell: ({ row, getValue }) => <div className="date-cell"><span className={`traffic traffic-${row.original.semaforo?.toLowerCase()}`} />{formatDate(getValue())}</div> }),
+    helper.display({ id: 'egob', header: 'eGob', cell: ({ row }) => {
+      const issueNumber = getEgobIssueNumber(row.original)
+      const issueUrl = getEgobIssueUrl(row.original)
+      return issueUrl ? <a className="egob-link" href={issueUrl} target="_blank" rel="noreferrer" title={`Abrir trámite eGob ${issueNumber}`}><ExternalLink size={14} /> {issueNumber}</a> : <span className="muted-cell">—</span>
+    } }),
     helper.display({ id: 'actions', cell: ({ row }) => <div className="row-actions">{canEditProcesses(role, userEmail) && <button onClick={() => onEdit(row.original)} title="Editar"><Pencil size={16} /></button>}{role === 'admin' && <button onClick={() => confirm('¿Archivar este trámite?') && void deleteProcess(row.original.id)} title="Archivar"><Trash2 size={16} /></button>}<button title="Más acciones"><MoreHorizontal size={17} /></button></div> }),
   ], [navigate, onEdit, deleteProcess, role, userEmail])
   const table = useReactTable({

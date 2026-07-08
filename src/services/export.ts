@@ -10,6 +10,8 @@ const rows = (processes: Process[]) => processes.map((item) => ({
   'Fin real': item.fecha_fin_real, Estado: item.estado?.nombre, Prioridad: item.prioridad?.nombre,
   'Avance %': item.porcentaje_avance, Semáforo: item.semaforo, 'Días retraso': item.dias_retraso,
   'Dependencia externa': item.dependencia_externa, 'Próxima acción': item.proxima_accion,
+  'Nro. eGob': item.egob_numero, 'URL eGob': item.egob_url, 'Estado eGob': item.egob_estado,
+  'Último movimiento eGob': item.egob_ultimo_movimiento,
 }))
 
 export function exportProcessesToXlsx(processes: Process[], fileName = 'matriz-tramites-gadmr.xlsx') {
