@@ -16,10 +16,10 @@ const nav = [
 
 const titles: Record<string, [string, string]> = {
   '/': ['Centro gerencial', 'Una lectura clara de lo que avanza, lo que vence y lo que necesita decisión.'],
-  '/procesos': ['Gestión de procesos', 'Consulta, filtra y actualiza el portafolio institucional.'],
+  '/procesos': ['Gestión de procesos', 'Consulta, filtra y actualiza la matriz de tr?mites institucionales.'],
   '/kanban': ['Flujo institucional', 'Los procesos organizados por su estado actual.'],
   '/alertas': ['Atención requerida', 'Prioridades, retrasos y vacíos de gestión para resolver hoy.'],
-  '/importar': ['Datos y reportes', 'Importa la base inicial y genera entregables gerenciales.'],
+  '/importar': ['Datos y reportes', 'Importa matrices de seguimiento y genera entregables gerenciales.'],
   '/catalogos': ['Configuración institucional', 'Administra áreas, tipos, estados y prioridades.'],
 }
 
@@ -35,7 +35,7 @@ export function Layout({ children }: { children: ReactNode }) {
   return <div className="app-shell">
     <aside className={cn('sidebar', collapsed && 'sidebar-collapsed', open && 'sidebar-open')}>
       <div className="brand">
-        <div className="brand-mark"><img src="/rdr-icon.png" alt="EP Rutas de Riobamba" /></div>
+        <div className="brand-mark"><img src="/rdr-icon.png" alt="Seguimiento de trámites" /></div>
         {!collapsed && <div><strong>Rutas de Riobamba</strong><small>Empresa Pública de Movilidad</small></div>}
         <button className="mobile-close" onClick={() => setOpen(false)}><X size={20} /></button>
       </div>

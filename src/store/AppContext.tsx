@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
-import { areas as demoAreas, demoProcesses, priorities as demoPriorities, processTypes as demoTypes, statuses as demoStatuses } from '../data/demo'
+import { areas as demoAreas, demoProcesses, priorities as demoPriorities, processTypes as demoTypes, statuses as demoStatuses } from '../data/tramites'
 import { deriveProcess, uid } from '../lib/utils'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import type { CatalogItem, ChangeLog, Process, ProcessFormData, Role } from '../types'
@@ -26,7 +26,7 @@ interface AppState {
 }
 
 const AppContext = createContext<AppState | null>(null)
-const storageKey = 'epm-mobility-processes-v1'
+const storageKey = 'tramites-varios-processes-v1'
 
 function hydrate(process: Process, areas: CatalogItem[], types: CatalogItem[], statuses: CatalogItem[], priorities: CatalogItem[]) {
   return deriveProcess({
