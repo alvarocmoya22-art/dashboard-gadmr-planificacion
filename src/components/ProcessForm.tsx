@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+﻿import { useEffect } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -58,7 +58,7 @@ export function ProcessForm({ process, onClose }: { process?: Process; onClose: 
     if (Number(progress) === 100 && finalStatus && statusId !== finalStatus.id) {
       form.setValue('estado_id', finalStatus.id)
     }
-  }, [progress])
+  }, [progress, finalStatus, statusId, form])
 
   async function submit(data: ProcessFormData) {
     try {
@@ -66,7 +66,7 @@ export function ProcessForm({ process, onClose }: { process?: Process; onClose: 
       await saveProcess(data, process)
       onClose()
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'No se pudo guardar el proceso.')
+      toast.error(error instanceof Error ? error.message : 'No se pudo guardar el trámite.')
     }
   }
 
@@ -77,12 +77,12 @@ export function ProcessForm({ process, onClose }: { process?: Process; onClose: 
 
   return <div className="modal-backdrop" role="dialog" aria-modal="true">
     <div className="modal-panel">
-      <div className="modal-header"><div><p className="eyebrow">Registro institucional</p><h2>{process ? 'Editar proceso' : 'Nuevo proceso'}</h2></div><button onClick={onClose}><X /></button></div>
+      <div className="modal-header"><div><p className="eyebrow">Registro institucional</p><h2>{process ? 'Editar trámite' : 'Nuevo trámite'}</h2></div><button onClick={onClose}><X /></button></div>
       <form onSubmit={form.handleSubmit(submit, showValidationHelp)}>
         <div className="form-grid">
           <Field label="Área responsable *" error={form.formState.errors.area_id?.message}><Select {...form.register('area_id')}><option value="">Seleccionar…</option>{areas.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}</Select></Field>
-          <Field label="Tipo de proceso *" error={form.formState.errors.tipo_proceso_id?.message}><Select {...form.register('tipo_proceso_id')}><option value="">Seleccionar…</option>{processTypes.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}</Select></Field>
-          <Field label="Nombre del proceso *" className="span-2" error={form.formState.errors.nombre_proceso?.message}><Input {...form.register('nombre_proceso')} /></Field>
+          <Field label="Tipo de trámite *" error={form.formState.errors.tipo_proceso_id?.message}><Select {...form.register('tipo_proceso_id')}><option value="">Seleccionar…</option>{processTypes.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}</Select></Field>
+          <Field label="Nombre del trámite *" className="span-2" error={form.formState.errors.nombre_proceso?.message}><Input {...form.register('nombre_proceso')} /></Field>
           <Field label="Responsable principal *" error={form.formState.errors.responsable_principal?.message}><Input {...form.register('responsable_principal')} /></Field>
           <Field label="Responsable secundario"><Input {...form.register('responsable_secundario')} /></Field>
           <Field label="Fecha inicio *" error={form.formState.errors.fecha_inicio?.message}><Input type="date" {...form.register('fecha_inicio')} /></Field>
@@ -100,7 +100,7 @@ export function ProcessForm({ process, onClose }: { process?: Process; onClose: 
           <Field label="Confidencialidad"><Select {...form.register('confidencialidad')}><option>Pública</option><option>Interna</option><option>Reservada</option></Select></Field>
           <label className="check-field"><input type="checkbox" {...form.register('requiere_accion_gerencial')} /><span>Requiere acción gerencial</span></label>
         </div>
-        <div className="modal-actions"><Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button><Button type="submit" disabled={form.formState.isSubmitting}>{process ? 'Guardar cambios' : 'Crear proceso'}</Button></div>
+        <div className="modal-actions"><Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button><Button type="submit" disabled={form.formState.isSubmitting}>{process ? 'Guardar cambios' : 'Crear trámite'}</Button></div>
       </form>
     </div>
   </div>

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react'
+﻿import { useState, type ReactNode } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { Bell, BookOpen, ChartNoAxesCombined, ChevronLeft, FileUp, KanbanSquare, LayoutDashboard, LogOut, Menu, Moon, Search, Settings2, TableProperties, X } from 'lucide-react'
 import { useApp } from '../store/AppContext'
@@ -16,8 +16,8 @@ const nav = [
 
 const titles: Record<string, [string, string]> = {
   '/': ['Centro gerencial', 'Una lectura clara de lo que avanza, lo que vence y lo que necesita decisión.'],
-  '/procesos': ['Gestión de procesos', 'Consulta, filtra y actualiza la matriz de tr?mites institucionales.'],
-  '/kanban': ['Flujo institucional', 'Los procesos organizados por su estado actual.'],
+  '/procesos': ['Gestión de trámites', 'Consulta, filtra y actualiza la matriz de trámites institucionales.'],
+  '/kanban': ['Flujo institucional', 'Los trámites organizados por su estado actual.'],
   '/alertas': ['Atención requerida', 'Prioridades, retrasos y vacíos de gestión para resolver hoy.'],
   '/importar': ['Datos y reportes', 'Importa matrices de seguimiento y genera entregables gerenciales.'],
   '/catalogos': ['Configuración institucional', 'Administra áreas, tipos, estados y prioridades.'],
@@ -29,14 +29,14 @@ export function Layout({ children }: { children: ReactNode }) {
   const { pathname } = useLocation()
   const { demoMode, userName, role, canAccessManagement } = useApp()
   const visibleNav = canAccessManagement ? nav : nav.filter((item) => item.to === '/procesos')
-  const [title, description] = titles[pathname] ?? ['Detalle del proceso', 'Trazabilidad completa del proceso institucional.']
+  const [title, description] = titles[pathname] ?? ['Detalle del trámite', 'Trazabilidad completa del trámite institucional.']
   const signOut = async () => { await supabase?.auth.signOut() }
 
   return <div className="app-shell">
     <aside className={cn('sidebar', collapsed && 'sidebar-collapsed', open && 'sidebar-open')}>
       <div className="brand">
-        <div className="brand-mark"><img src="/rdr-icon.png" alt="Seguimiento de trámites" /></div>
-        {!collapsed && <div><strong>Rutas de Riobamba</strong><small>Empresa Pública de Movilidad</small></div>}
+        <div className="brand-mark"><img src="/gadmr-logo.png" alt="GADMR Riobamba" /></div>
+        {!collapsed && <div><strong>GADMR Riobamba</strong><small>Planificación, Hábitat y Desarrollo Urbanístico</small></div>}
         <button className="mobile-close" onClick={() => setOpen(false)}><X size={20} /></button>
       </div>
       <nav>
@@ -53,7 +53,7 @@ export function Layout({ children }: { children: ReactNode }) {
     <div className="main-shell">
       <header className="topbar">
         <button className="mobile-menu" onClick={() => setOpen(true)}><Menu size={22} /></button>
-        <div className="global-search"><Search size={18} /><input placeholder="Buscar proceso, código o responsable…" /></div>
+        <div className="global-search"><Search size={18} /><input placeholder="Buscar trámite, código o responsable…" /></div>
         <div className="top-actions">
           <button title="Modo oscuro"><Moon size={19} /></button>
           <button title="Notificaciones" className="notification-button"><Bell size={19} /><i /></button>

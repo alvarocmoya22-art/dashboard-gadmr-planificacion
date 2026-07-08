@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+﻿import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { areas as demoAreas, demoProcesses, priorities as demoPriorities, processTypes as demoTypes, statuses as demoStatuses } from '../data/tramites'
 import { deriveProcess, uid } from '../lib/utils'
@@ -91,7 +91,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const client = supabase
     if (!client) return
     const channel = client.channel('processes-realtime').on('postgres_changes', { event: '*', schema: 'public', table: 'processes' }, () => {
-      toast.info('Un proceso fue actualizado. Sincronizando…')
+      toast.info('Un trámite fue actualizado. Sincronizando…')
       client.from('processes').select('*, area:areas(*), tipo:process_types(*), estado:process_statuses(*), prioridad:priorities(*)').eq('activo', true)
         .then(({ data }) => data && setProcesses(data.map(deriveProcess)))
     }).subscribe()
@@ -124,14 +124,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const full = deriveProcess(response.data)
         setProcesses((old) => current ? old.map((item) => item.id === current.id ? full : item) : [full, ...old])
       }
-      toast.success(current ? 'Proceso actualizado' : 'Proceso creado')
+      toast.success(current ? 'Trámite actualizado' : 'Trámite creado')
       return
     }
     const now = new Date().toISOString()
     const base: Process = {
       ...data,
       id: current?.id ?? uid(),
-      codigo_proceso: current?.codigo_proceso ?? `EPM-${new Date().getFullYear()}-${String(processes.length + 1).padStart(4, '0')}`,
+      codigo_proceso: current?.codigo_proceso ?? `TRV-${new Date().getFullYear()}-${String(processes.length + 1).padStart(4, '0')}`,
       activo: true,
       created_at: current?.created_at ?? now,
       updated_at: now,
@@ -150,7 +150,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     const full = hydrate(base, areas, processTypes, statuses, priorities)
     setProcesses((old) => current ? old.map((item) => item.id === current.id ? full : item) : [full, ...old])
-    toast.success(current ? 'Proceso actualizado' : 'Proceso creado')
+    toast.success(current ? 'Trámite actualizado' : 'Trámite creado')
   }
 
   async function deleteProcess(id: string) {
@@ -159,7 +159,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (error) throw error
     }
     setProcesses((old) => old.filter((item) => item.id !== id))
-    toast.success('Proceso archivado')
+    toast.success('Trámite archivado')
   }
 
   async function importProcesses(rows: ProcessFormData[]) {

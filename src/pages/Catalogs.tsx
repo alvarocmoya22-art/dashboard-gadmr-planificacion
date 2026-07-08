@@ -1,4 +1,4 @@
-import { useState } from 'react'
+﻿import { useState } from 'react'
 import { Building2, CircleDot, Flag, Layers3, Plus } from 'lucide-react'
 import { Button, Card, Input } from '../components/ui'
 import { useApp } from '../store/AppContext'
@@ -9,7 +9,7 @@ export function Catalogs() {
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const catalogs: Array<{ key: 'areas' | 'processTypes' | 'statuses' | 'priorities'; title: string; icon: typeof Building2; items: CatalogItem[] }> = [
     { key: 'areas', title: 'Áreas responsables', icon: Building2, items: app.areas },
-    { key: 'processTypes', title: 'Tipos de proceso', icon: Layers3, items: app.processTypes },
+    { key: 'processTypes', title: 'Tipos de trámite', icon: Layers3, items: app.processTypes },
     { key: 'statuses', title: 'Estados', icon: CircleDot, items: app.statuses },
     { key: 'priorities', title: 'Prioridades', icon: Flag, items: app.priorities },
   ]

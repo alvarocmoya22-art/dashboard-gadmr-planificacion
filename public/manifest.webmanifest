@@ -1,13 +1,13 @@
 {
-  "name": "Seguimiento de Tr?mites",
-  "short_name": "Tr?mites",
+  "name": "GADMR Seguimiento de Trámites",
+  "short_name": "Trámites",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#f2f5f3",
   "theme_color": "#102f3b",
   "icons": [
     {
-      "src": "/rdr-icon.png",
+      "src": "/gadmr-logo.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
