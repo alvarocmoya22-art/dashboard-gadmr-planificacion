@@ -332,6 +332,7 @@ const rawTramitesProcesses: Process[] = [
     "egob_numero": "970395",
     "egob_url": "https://egobedoc.gadmriobamba.gob.ec:8081/issues/970395",
     "egob_estado": "Nuevo / Reasignado a Natalia Elizabeth Subia Andrade",
+    "egob_responsable_actual": "NATALIA ELIZABETH SUBIA ANDRADE",
     "egob_ultimo_movimiento": "2026-06-08 16:04 - FIRMADO_1111482 PROYECTOS FINAL.pdf",
     "proxima_accion": "Planimetria de Unificación y Memoria Tecnica, Procuraduria y Consejo",
     "objetivo": "Funcionamiento de la Plaza de Rastro Licto",

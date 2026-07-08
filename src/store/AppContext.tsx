@@ -113,6 +113,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         egob_numero: data.egob_numero || null,
         egob_url: data.egob_url || null,
         egob_estado: data.egob_estado || null,
+        egob_responsable_actual: data.egob_responsable_actual || null,
         egob_ultimo_movimiento: data.egob_ultimo_movimiento || null,
         proxima_accion: data.proxima_accion || null,
         objetivo: data.objetivo || null,

@@ -28,6 +28,7 @@ export interface Process {
   egob_numero?: string
   egob_url?: string
   egob_estado?: string
+  egob_responsable_actual?: string
   egob_ultimo_movimiento?: string
   proxima_accion?: string
   objetivo?: string
@@ -73,6 +74,7 @@ export interface ProcessFormData {
   egob_numero?: string
   egob_url?: string
   egob_estado?: string
+  egob_responsable_actual?: string
   egob_ultimo_movimiento?: string
   proxima_accion?: string
   objetivo?: string

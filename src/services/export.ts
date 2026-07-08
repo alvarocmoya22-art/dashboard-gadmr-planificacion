@@ -11,6 +11,7 @@ const rows = (processes: Process[]) => processes.map((item) => ({
   'Avance %': item.porcentaje_avance, Semáforo: item.semaforo, 'Días retraso': item.dias_retraso,
   'Dependencia externa': item.dependencia_externa, 'Próxima acción': item.proxima_accion,
   'Nro. eGob': item.egob_numero, 'URL eGob': item.egob_url, 'Estado eGob': item.egob_estado,
+  'Actualmente con': item.egob_responsable_actual,
   'Último movimiento eGob': item.egob_ultimo_movimiento,
 }))
 

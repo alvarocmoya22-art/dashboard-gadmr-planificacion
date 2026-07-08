@@ -34,6 +34,7 @@ export async function parseProcessWorkbook(file: File, catalogs: CatalogContext)
       egob_numero: normalizeText(row['Nro. eGob'] ?? row['Trámite eGob'] ?? row['Nro. trámite eGob']),
       egob_url: normalizeText(row['URL eGob']),
       egob_estado: normalizeText(row['Estado eGob']),
+      egob_responsable_actual: normalizeText(row['Actualmente con'] ?? row['Responsable eGob']),
       egob_ultimo_movimiento: normalizeText(row['Último movimiento eGob']),
       proxima_accion: normalizeText(row['Próxima Acción']),
       objetivo: normalizeText(row.Objetivo),
