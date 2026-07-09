@@ -1,4 +1,4 @@
-import { differenceInCalendarDays, format, isBefore, isWithinInterval, addDays, parseISO } from 'date-fns'
+﻿import { differenceInCalendarDays, format, isBefore, isWithinInterval, addDays, parseISO } from 'date-fns'
 import type { CatalogItem, Process, TrafficLight } from '../types'
 
 export const cn = (...parts: Array<string | false | null | undefined>) => parts.filter(Boolean).join(' ')
@@ -6,7 +6,7 @@ export const uid = () => crypto.randomUUID()
 export const todayIso = () => format(new Date(), 'yyyy-MM-dd')
 
 export function deriveProcess(process: Process): Process {
-  const status = process.estado?.nombre ?? ''
+  const status = repairMojibake(process.estado?.nombre ?? '')
   const end = parseISO(process.fecha_fin_programada)
   const today = new Date()
   let semaforo: TrafficLight = 'Verde'
@@ -16,6 +16,10 @@ export function deriveProcess(process: Process): Process {
   else if (isWithinInterval(end, { start: today, end: addDays(today, 7) })) semaforo = 'Amarillo'
   return {
     ...process,
+    area: process.area ? { ...process.area, nombre: repairMojibake(process.area.nombre) } : process.area,
+    tipo: process.tipo ? { ...process.tipo, nombre: repairMojibake(process.tipo.nombre) } : process.tipo,
+    estado: process.estado ? { ...process.estado, nombre: repairMojibake(process.estado.nombre) } : process.estado,
+    prioridad: process.prioridad ? { ...process.prioridad, nombre: repairMojibake(process.prioridad.nombre) } : process.prioridad,
     nombre_proceso: repairMojibake(process.nombre_proceso),
     responsable_principal: repairMojibake(process.responsable_principal),
     responsable_secundario: process.responsable_secundario ? repairMojibake(process.responsable_secundario) : process.responsable_secundario,
@@ -32,39 +36,51 @@ export function deriveProcess(process: Process): Process {
   }
 }
 
-export const formatDate = (value?: string) => value ? format(parseISO(value), 'dd/MM/yyyy') : '—'
+export const formatDate = (value?: string) => value ? format(parseISO(value), 'dd/MM/yyyy') : 'â€”'
 export const getCatalogName = (items: CatalogItem[], id: string) => items.find((item) => item.id === id)?.nombre ?? 'Sin asignar'
 
 export function repairMojibake(value: unknown) {
   let text = String(value ?? '')
-  for (let index = 0; index < 2 && /Ã|Â|â/.test(text); index += 1) {
+  for (let index = 0; index < 3 && /Ã|Â|â|�/.test(text); index += 1) {
     try {
       const bytes = Uint8Array.from([...text].map((char) => char.charCodeAt(0) & 255))
       const decoded = new TextDecoder('utf-8', { fatal: false }).decode(bytes)
-      if (decoded && decoded !== text && !decoded.includes('�')) text = decoded
+      if (decoded && decoded !== text && !decoded.includes('ï¿½')) text = decoded
     } catch {
       break
     }
   }
   return text
-    .replace(/Ã¡/g, 'á')
-    .replace(/Ã©/g, 'é')
-    .replace(/Ã­/g, 'í')
-    .replace(/Ã³/g, 'ó')
-    .replace(/Ãº/g, 'ú')
-    .replace(/Ã±/g, 'ñ')
-    .replace(/Ã/g, 'Á')
-    .replace(/Ã‰/g, 'É')
-    .replace(/Ã/g, 'Í')
-    .replace(/Ã“/g, 'Ó')
-    .replace(/Ãš/g, 'Ú')
-    .replace(/Ã‘/g, 'Ñ')
-    .replace(/Â·/g, '·')
-    .replace(/â€”/g, '—')
-    .replace(/â€¦/g, '…')
-    .replace(/â€œ/g, '“')
-    .replace(/â€/g, '”')
-    .replace(/â†’/g, '→')
+    .replace(/\u00c3\u00a1/g, 'á')
+    .replace(/\u00c3\u00a9/g, 'é')
+    .replace(/\u00c3\u00ad/g, 'í')
+    .replace(/\u00c3\u00b3/g, 'ó')
+    .replace(/\u00c3\u00ba/g, 'ú')
+    .replace(/\u00c3\u00b1/g, 'ñ')
+    .replace(/\u00c3\u0081/g, 'Á')
+    .replace(/\u00c3\u0089/g, 'É')
+    .replace(/\u00c3\u008d/g, 'Í')
+    .replace(/\u00c3\u0093/g, 'Ó')
+    .replace(/\u00c3\u009a/g, 'Ú')
+    .replace(/\u00c3\u0091/g, 'Ñ')
+    .replace(/ÃƒÂ¡/g, 'Ã¡')
+    .replace(/ÃƒÂ©/g, 'Ã©')
+    .replace(/ÃƒÂ­/g, 'Ã­')
+    .replace(/ÃƒÂ³/g, 'Ã³')
+    .replace(/ÃƒÂº/g, 'Ãº')
+    .replace(/ÃƒÂ±/g, 'Ã±')
+    .replace(/ÃƒÂ/g, 'Ã')
+    .replace(/Ãƒâ€°/g, 'Ã‰')
+    .replace(/ÃƒÂ/g, 'Ã')
+    .replace(/Ãƒâ€œ/g, 'Ã“')
+    .replace(/ÃƒÅ¡/g, 'Ãš')
+    .replace(/Ãƒâ€˜/g, 'Ã‘')
+    .replace(/Ã‚Â·/g, 'Â·')
+    .replace(/Ã¢â‚¬â€/g, 'â€”')
+    .replace(/Ã¢â‚¬Â¦/g, 'â€¦')
+    .replace(/Ã¢â‚¬Å“/g, 'â€œ')
+    .replace(/Ã¢â‚¬Â/g, 'â€')
+    .replace(/Ã¢â€ â€™/g, 'â†’')
     .replace(/Subdivisi.n/g, 'Subdivisión')
     .replace(/Revisi.n/g, 'Revisión')
     .replace(/Observaci.n/g, 'Observación')
@@ -112,3 +128,6 @@ export function normalizeProgress(value: unknown): number {
   if (!Number.isFinite(numeric)) return 0
   return Math.max(0, Math.min(100, numeric > 0 && numeric <= 1 ? numeric * 100 : numeric))
 }
+
+
+

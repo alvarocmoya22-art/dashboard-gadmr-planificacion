@@ -201,13 +201,42 @@ function parseLatestReassignmentFromBlocks(text) {
   }
 }
 
+function parseLatestReassignmentByAssignmentLine(text) {
+  const events = []
+  const assignmentPattern = /Asignado ha cambiado de\s+(.+?)\s+a\s+([^\n]+)/gi
+
+  for (const match of text.matchAll(assignmentPattern)) {
+    const before = text.slice(Math.max(0, (match.index || 0) - 1600), match.index || 0)
+    const dates = [...before.matchAll(/(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})/g)]
+    const issues = [...before.matchAll(/\(\s*(\d{5,})\s*\)/g)]
+    const date = dates.at(-1)?.[1]?.replace(/\s+/g, ' ').trim() || ''
+    const issue = issues.at(-1)?.[1] || ''
+    const to = match[2].replace(/\s+/g, ' ').trim()
+    if (!to) continue
+    events.push({
+      issue,
+      date,
+      responsable_actual: to,
+      ultimo_movimiento: `${date} - ReasignaciÃ³n a ${to}`,
+    })
+  }
+
+  if (!events.length) return null
+
+  return events.reduce((best, event) => {
+    const bestTime = best.date ? new Date(best.date.replace(' ', 'T')).getTime() : 0
+    const eventTime = event.date ? new Date(event.date.replace(' ', 'T')).getTime() : 0
+    return eventTime >= bestTime ? event : best
+  }, events[0])
+}
+
 function parseIssue(issue, html, finalUrl) {
   const text = stripText(html)
   const estado = text.match(/Estado:\s*([^\n]+?)\s*Prioridad:/i)?.[1]?.trim() || ''
   const prioridad = text.match(/Prioridad:\s*([^\n]+?)\s*Fecha registro:/i)?.[1]?.trim() || ''
   const actualizado = text.match(/Actualizado el\s+(.+?)\s*\./i)?.[1]?.trim() || ''
   const asunto = text.match(/Asunto:\s*(.+?)\s*Creado por/i)?.[1]?.trim() || ''
-  const latestReassignment = parseLatestReassignmentFromBlocks(text) || parseLatestReassignment(text)
+  const latestReassignment = parseLatestReassignmentByAssignmentLine(text) || parseLatestReassignmentFromBlocks(text) || parseLatestReassignment(text)
   const responsableActual = latestReassignment?.responsable_actual || parseCurrentAssignee(text)
   const latestAttachment = parseLatestAttachment(text)
   const children = [...html.matchAll(/href=["']\/issues\/(\d+)["']/g)].map((item) => item[1]).filter((value, index, array) => array.indexOf(value) === index && value !== issue)
