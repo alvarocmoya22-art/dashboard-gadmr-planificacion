@@ -203,15 +203,20 @@ function parseLatestReassignmentFromBlocks(text) {
 
 function parseLatestReassignmentByAssignmentLine(text) {
   const events = []
-  const assignmentPattern = /Asignado ha cambiado de\s+(.+?)\s+a\s+([^\n]+)/gi
+  const sectionStarts = [...text.matchAll(/Reasignaci[oÃ³?]n/gi)].map((match) => match.index || 0)
+  const sections = sectionStarts.length
+    ? sectionStarts.map((start, index) => text.slice(start, sectionStarts[index + 1] || text.length))
+    : [text]
 
-  for (const match of text.matchAll(assignmentPattern)) {
-    const before = text.slice(Math.max(0, (match.index || 0) - 1600), match.index || 0)
-    const dates = [...before.matchAll(/(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})/g)]
-    const issues = [...before.matchAll(/\(\s*(\d{5,})\s*\)/g)]
+  for (const section of sections) {
+    if (!/Asignado ha cambiado de/i.test(section)) continue
+    const assignment = section.match(/Asignado ha cambiado de\s+(.+?)\s+a\s+(.+?)(?:\n|Nota:|No hay|Reasignaci[oÃ³?]n|$)/i)
+    if (!assignment) continue
+    const dates = [...section.matchAll(/(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})/g)]
+    const issues = [...section.matchAll(/\(\s*(\d{5,})\s*\)/g)]
     const date = dates.at(-1)?.[1]?.replace(/\s+/g, ' ').trim() || ''
     const issue = issues.at(-1)?.[1] || ''
-    const to = match[2].replace(/\s+/g, ' ').trim()
+    const to = assignment[2].replace(/\s+/g, ' ').trim()
     if (!to) continue
     events.push({
       issue,

@@ -36,12 +36,12 @@ export function deriveProcess(process: Process): Process {
   }
 }
 
-export const formatDate = (value?: string) => value ? format(parseISO(value), 'dd/MM/yyyy') : 'â€”'
+export const formatDate = (value?: string) => value ? format(parseISO(value), 'dd/MM/yyyy') : '—'
 export const getCatalogName = (items: CatalogItem[], id: string) => items.find((item) => item.id === id)?.nombre ?? 'Sin asignar'
 
 export function repairMojibake(value: unknown) {
   let text = String(value ?? '')
-  for (let index = 0; index < 3 && /Ã|Â|â|�/.test(text); index += 1) {
+  for (let index = 0; index < 3 && /[\u00c3\u00c2\u00e2]/.test(text); index += 1) {
     try {
       const bytes = Uint8Array.from([...text].map((char) => char.charCodeAt(0) & 255))
       const decoded = new TextDecoder('utf-8', { fatal: false }).decode(bytes)
@@ -82,6 +82,7 @@ export function repairMojibake(value: unknown) {
     .replace(/Ã¢â‚¬Â/g, 'â€')
     .replace(/Ã¢â€ â€™/g, 'â†’')
     .replace(/Subdivisi.n/g, 'Subdivisión')
+    .replace(/Ejecuci.n/g, 'Ejecución')
     .replace(/Revisi.n/g, 'Revisión')
     .replace(/Observaci.n/g, 'Observación')
     .replace(/Federaci.n/g, 'Federación')
@@ -93,6 +94,15 @@ export function repairMojibake(value: unknown) {
     .replace(/sesi.n/g, 'sesión')
     .replace(/prohibici.n/g, 'prohibición')
     .replace(/Recopilaci.n/g, 'Recopilación')
+    .replace(/HABILITACI.N/g, 'HABILITACIÓN')
+    .replace(/EDIFICACI.N/g, 'EDIFICACIÓN')
+    .replace(/PLANIFICACI.N/g, 'PLANIFICACIÓN')
+    .replace(/DIRECCI.N/g, 'DIRECCIÓN')
+    .replace(/DISE.O/g, 'DISEÑO')
+    .replace(/P.BLICA/g, 'PÚBLICA')
+    .replace(/DONACI.N/g, 'DONACIÓN')
+    .replace(/CORP.REAS/g, 'CORPÓREAS')
+    .replace(/VERIFICACI.N/g, 'VERIFICACIÓN')
 }
 
 export function normalizeText(value: unknown) {
@@ -128,6 +138,7 @@ export function normalizeProgress(value: unknown): number {
   if (!Number.isFinite(numeric)) return 0
   return Math.max(0, Math.min(100, numeric > 0 && numeric <= 1 ? numeric * 100 : numeric))
 }
+
 
 
 
