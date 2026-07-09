@@ -39,6 +39,9 @@ export function deriveProcess(process: Process): Process {
 export const formatDate = (value?: string) => value ? format(parseISO(value), 'dd/MM/yyyy') : '—'
 export const getCatalogName = (items: CatalogItem[], id: string) => items.find((item) => item.id === id)?.nombre ?? 'Sin asignar'
 
+const brokenAccent = '[\\uFFFD\\uFFFC\\u25A0-\\u25FF?]+'
+const preserveUpper = (match: string, upper: string, normal: string) => match === match.toLocaleUpperCase('es') ? upper : normal
+
 export function repairMojibake(value: unknown) {
   let text = String(value ?? '')
   for (let index = 0; index < 3 && /[\u00c3\u00c2\u00e2]/.test(text); index += 1) {
@@ -119,6 +122,22 @@ export function repairMojibake(value: unknown) {
     .replace(/T[\uFFFD?]+CNICA/gi, 'TÉCNICA')
     .replace(/TR[\uFFFD?]+MITE/gi, 'TRÁMITE')
     .replace(/TR[\uFFFD?]+MITES/gi, 'TRÁMITES')
+    .replace(new RegExp(`DONACI${brokenAccent}N`, 'gi'), (match) => preserveUpper(match, 'DONACIÓN', 'Donación'))
+    .replace(new RegExp(`PLANIFICACI${brokenAccent}N`, 'gi'), (match) => preserveUpper(match, 'PLANIFICACIÓN', 'Planificación'))
+    .replace(new RegExp(`HABILITACI${brokenAccent}N`, 'gi'), (match) => preserveUpper(match, 'HABILITACIÓN', 'Habilitación'))
+    .replace(new RegExp(`EDIFICACI${brokenAccent}N`, 'gi'), (match) => preserveUpper(match, 'EDIFICACIÓN', 'Edificación'))
+    .replace(new RegExp(`DIRECCI${brokenAccent}N`, 'gi'), (match) => preserveUpper(match, 'DIRECCIÓN', 'Dirección'))
+    .replace(new RegExp(`VERIFICACI${brokenAccent}N`, 'gi'), (match) => preserveUpper(match, 'VERIFICACIÓN', 'Verificación'))
+    .replace(new RegExp(`ACTUALIZACI${brokenAccent}N`, 'gi'), (match) => preserveUpper(match, 'ACTUALIZACIÓN', 'Actualización'))
+    .replace(new RegExp(`DESMEMBRACI${brokenAccent}N`, 'gi'), (match) => preserveUpper(match, 'DESMEMBRACIÓN', 'Desmembración'))
+    .replace(new RegExp(`DISE${brokenAccent}O`, 'gi'), (match) => preserveUpper(match, 'DISEÑO', 'Diseño'))
+    .replace(new RegExp(`P${brokenAccent}BLICA`, 'gi'), (match) => preserveUpper(match, 'PÚBLICA', 'Pública'))
+    .replace(new RegExp(`P${brokenAccent}BLICAS`, 'gi'), (match) => preserveUpper(match, 'PÚBLICAS', 'Públicas'))
+    .replace(new RegExp(`CORP${brokenAccent}REAS`, 'gi'), (match) => preserveUpper(match, 'CORPÓREAS', 'Corpóreas'))
+    .replace(/Planificación, HABITAT Y DESARROLLO/g, 'PLANIFICACIÓN, HABITAT Y DESARROLLO')
+    .replace(/Habilitación DE SUELO Y Edificación/g, 'HABILITACIÓN DE SUELO Y EDIFICACIÓN')
+    .replace(/Dirección DE OBRAS Públicas/g, 'DIRECCIÓN DE OBRAS PÚBLICAS')
+    .replace(/Diseño DE LA OBRA Pública/g, 'DISEÑO DE LA OBRA PÚBLICA')
 }
 
 export function normalizeText(value: unknown) {
