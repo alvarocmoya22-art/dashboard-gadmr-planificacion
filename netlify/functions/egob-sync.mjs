@@ -182,13 +182,32 @@ function parseLatestReassignment(text) {
   }
 }
 
+function parseLatestReassignmentFromBlocks(text) {
+  const blocks = text
+    .split(/\n(?=Reasignaci[oó?]n\b)/i)
+    .filter((block) => /Reasignaci[oó?]n/i.test(block) && /Asignado ha cambiado de/i.test(block))
+
+  const latest = blocks.at(-1)
+  if (!latest) return null
+
+  const date = latest.match(/(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})/)?.[1]?.replace(/\s+/g, ' ').trim() || ''
+  const assignment = latest.match(/Asignado ha cambiado de\s+(.+?)\s+a\s+([^\n]+)/i)
+  if (!assignment) return null
+
+  const to = assignment[2].replace(/\s+/g, ' ').trim()
+  return {
+    responsable_actual: to,
+    ultimo_movimiento: `${date} - Reasignación a ${to}`,
+  }
+}
+
 function parseIssue(issue, html, finalUrl) {
   const text = stripText(html)
   const estado = text.match(/Estado:\s*([^\n]+?)\s*Prioridad:/i)?.[1]?.trim() || ''
   const prioridad = text.match(/Prioridad:\s*([^\n]+?)\s*Fecha registro:/i)?.[1]?.trim() || ''
   const actualizado = text.match(/Actualizado el\s+(.+?)\s*\./i)?.[1]?.trim() || ''
   const asunto = text.match(/Asunto:\s*(.+?)\s*Creado por/i)?.[1]?.trim() || ''
-  const latestReassignment = parseLatestReassignment(text)
+  const latestReassignment = parseLatestReassignmentFromBlocks(text) || parseLatestReassignment(text)
   const responsableActual = latestReassignment?.responsable_actual || parseCurrentAssignee(text)
   const latestAttachment = parseLatestAttachment(text)
   const children = [...html.matchAll(/href=["']\/issues\/(\d+)["']/g)].map((item) => item[1]).filter((value, index, array) => array.indexOf(value) === index && value !== issue)
@@ -205,6 +224,60 @@ function parseIssue(issue, html, finalUrl) {
     tramites_hijos: children,
     sincronizado_en: new Date().toISOString(),
   }
+}
+
+function movementTime(issueData) {
+  const raw = issueData?.ultimo_movimiento || issueData?.actualizado_en || ''
+  const match = String(raw).match(/(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})/)
+  return match ? new Date(match[1].replace(' ', 'T')).getTime() : 0
+}
+
+function withIssuePrefix(issueData) {
+  if (!issueData?.ultimo_movimiento) return issueData
+  return {
+    ...issueData,
+    ultimo_movimiento: `Trámite ${issueData.issue}: ${issueData.ultimo_movimiento}`,
+  }
+}
+
+function mergeIssueChain(rootIssue, relatedIssues) {
+  const candidates = [rootIssue, ...relatedIssues].filter(Boolean)
+  const latest = candidates.reduce((best, item) => (movementTime(item) > movementTime(best) ? item : best), rootIssue)
+
+  return {
+    ...rootIssue,
+    estado: latest.estado || rootIssue.estado,
+    responsable_actual: latest.responsable_actual || rootIssue.responsable_actual,
+    ultimo_movimiento: latest.issue === rootIssue.issue
+      ? latest.ultimo_movimiento
+      : withIssuePrefix(latest).ultimo_movimiento,
+    actualizado_en: latest.actualizado_en || rootIssue.actualizado_en,
+    tramites_hijos: [...new Set(candidates.flatMap((item) => item.tramites_hijos || []).filter((item) => item !== rootIssue.issue))],
+    tramites_revisados: candidates.map((item) => item.issue),
+  }
+}
+
+async function readRelatedIssues(jar, rootIssue, linkedIssues, visited = new Set([rootIssue])) {
+  const related = []
+  const queue = [...new Set(linkedIssues || [])].filter((item) => item && !visited.has(item)).slice(0, 10)
+
+  while (queue.length) {
+    const issue = queue.shift()
+    if (!issue || visited.has(issue)) continue
+    visited.add(issue)
+
+    const page = await follow(jar, `${EGOB_BASE_URL}/issues/${encodeURIComponent(issue)}`)
+    if (page.url.includes('/cas/login') || !page.html.includes(`#${issue}`)) continue
+
+    const parsed = parseIssue(issue, page.html, page.url)
+    related.push(parsed)
+
+    for (const child of parsed.tramites_hijos || []) {
+      if (!visited.has(child) && queue.length < 10) queue.push(child)
+    }
+  }
+
+  return related
 }
 
 export async function loginAndReadIssue(issue) {
@@ -254,7 +327,10 @@ export async function loginAndReadIssue(issue) {
     throw error
   }
 
-  return parseIssue(issue, page.html, page.url)
+  const rootIssue = parseIssue(issue, page.html, page.url)
+  const relatedIssues = await readRelatedIssues(jar, issue, rootIssue.tramites_hijos)
+
+  return mergeIssueChain(rootIssue, relatedIssues)
 }
 
 export async function handler(event) {
