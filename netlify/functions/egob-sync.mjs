@@ -105,7 +105,7 @@ function formAction(html, currentUrl) {
 }
 
 function decodeHtml(value = '') {
-  return value
+  return repairMojibake(value
     .replace(/&nbsp;/g, ' ')
     .replace(/&amp;/g, '&')
     .replace(/&quot;/g, '"')
@@ -113,7 +113,26 @@ function decodeHtml(value = '') {
     .replace(/&lt;/g, '<')
     .replace(/&gt;/g, '>')
     .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
-    .replace(/&#x([a-f0-9]+);/gi, (_, code) => String.fromCharCode(parseInt(code, 16)))
+    .replace(/&#x([a-f0-9]+);/gi, (_, code) => String.fromCharCode(parseInt(code, 16))))
+}
+
+function repairMojibake(value = '') {
+  return String(value)
+    .replace(/Ã¡/g, 'á')
+    .replace(/Ã©/g, 'é')
+    .replace(/Ã­/g, 'í')
+    .replace(/Ã³/g, 'ó')
+    .replace(/Ãº/g, 'ú')
+    .replace(/Ã±/g, 'ñ')
+    .replace(/Ã/g, 'Á')
+    .replace(/Ã‰/g, 'É')
+    .replace(/Ã/g, 'Í')
+    .replace(/Ã“/g, 'Ó')
+    .replace(/Ãš/g, 'Ú')
+    .replace(/Ã‘/g, 'Ñ')
+    .replace(/Â·/g, '·')
+    .replace(/â€”/g, '—')
+    .replace(/â€¦/g, '…')
 }
 
 function stripText(html) {
@@ -150,13 +169,27 @@ function parseLatestAttachment(text) {
   return match ? `${match[2]} - ${match[1].replace(/\s+/g, ' ').trim()}` : ''
 }
 
+function parseLatestReassignment(text) {
+  const pattern = /Reasignaci[oó?]n[\s\S]{0,500}?\(\s*(\d+)\s*\)[\s\S]{0,500}?(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})[\s\S]{0,700}?Asignado ha cambiado de\s+(.+?)\s+a\s+(.+?)(?:\n|$)/gi
+  const matches = [...text.matchAll(pattern)]
+  const latest = matches.at(-1)
+  if (!latest) return null
+  const to = latest[4].replace(/\s+/g, ' ').trim()
+  const date = latest[2].replace(/\s+/g, ' ').trim()
+  return {
+    responsable_actual: to,
+    ultimo_movimiento: `${date} - Reasignación a ${to}`,
+  }
+}
+
 function parseIssue(issue, html, finalUrl) {
   const text = stripText(html)
   const estado = text.match(/Estado:\s*([^\n]+?)\s*Prioridad:/i)?.[1]?.trim() || ''
   const prioridad = text.match(/Prioridad:\s*([^\n]+?)\s*Fecha registro:/i)?.[1]?.trim() || ''
   const actualizado = text.match(/Actualizado el\s+(.+?)\s*\./i)?.[1]?.trim() || ''
   const asunto = text.match(/Asunto:\s*(.+?)\s*Creado por/i)?.[1]?.trim() || ''
-  const responsableActual = parseCurrentAssignee(text)
+  const latestReassignment = parseLatestReassignment(text)
+  const responsableActual = latestReassignment?.responsable_actual || parseCurrentAssignee(text)
   const latestAttachment = parseLatestAttachment(text)
   const children = [...html.matchAll(/href=["']\/issues\/(\d+)["']/g)].map((item) => item[1]).filter((value, index, array) => array.indexOf(value) === index && value !== issue)
 
@@ -167,14 +200,14 @@ function parseIssue(issue, html, finalUrl) {
     estado,
     prioridad,
     responsable_actual: responsableActual,
-    ultimo_movimiento: latestAttachment || (actualizado ? `Actualizado el ${actualizado}` : ''),
+    ultimo_movimiento: latestReassignment?.ultimo_movimiento || latestAttachment || (actualizado ? `Actualizado el ${actualizado}` : ''),
     actualizado_en: actualizado,
     tramites_hijos: children,
     sincronizado_en: new Date().toISOString(),
   }
 }
 
-async function loginAndReadIssue(issue) {
+export async function loginAndReadIssue(issue) {
   const username = process.env.EGOB_USERNAME
   const password = process.env.EGOB_PASSWORD
   if (!username || !password) {

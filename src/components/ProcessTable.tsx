@@ -4,7 +4,7 @@ import { ArrowUpDown, ExternalLink, MoreHorizontal, Pencil, Search, Trash2 } fro
 import { useNavigate } from 'react-router-dom'
 import type { Process } from '../types'
 import { Badge, Button, Input, Select } from './ui'
-import { formatDate } from '../lib/utils'
+import { formatDate, normalizeText } from '../lib/utils'
 import { useApp } from '../store/AppContext'
 import { canEditProcesses } from '../lib/permissions'
 import { getEgobIssueNumber, getEgobIssueUrl } from '../lib/egob'
@@ -12,13 +12,36 @@ import { getEgobIssueNumber, getEgobIssueUrl } from '../lib/egob'
 const helper = createColumnHelper<Process>()
 
 export function ProcessTable({ onEdit }: { onEdit: (process: Process) => void }) {
-  const { processes, deleteProcess, statuses, areas, role, userEmail } = useApp()
+  const { processes, deleteProcess, statuses, areas, role, userEmail, globalSearch, setGlobalSearch } = useApp()
   const [sorting, setSorting] = useState<SortingState>([])
-  const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
   const [area, setArea] = useState('')
   const navigate = useNavigate()
-  const filtered = useMemo(() => processes.filter((process) => (!status || process.estado_id === status) && (!area || process.area_id === area)), [processes, status, area])
+  const search = globalSearch
+  const filtered = useMemo(() => {
+    const query = normalizeText(search).toLocaleLowerCase('es')
+    return processes.filter((process) => {
+      const matchesFilters = (!status || process.estado_id === status) && (!area || process.area_id === area)
+      if (!matchesFilters) return false
+      if (!query) return true
+      const text = [
+        process.codigo_proceso,
+        process.nombre_proceso,
+        process.responsable_principal,
+        process.responsable_secundario,
+        process.area?.nombre,
+        process.estado?.nombre,
+        process.prioridad?.nombre,
+        process.documento_respaldo,
+        process.egob_numero,
+        process.egob_responsable_actual,
+        process.proxima_accion,
+        process.objetivo,
+        process.observaciones,
+      ].map(normalizeText).join(' ').toLocaleLowerCase('es')
+      return text.includes(query)
+    })
+  }, [processes, status, area, search])
   const columns = useMemo(() => [
     helper.accessor('codigo_proceso', { header: 'Código', cell: ({ row, getValue }) => <button className="code-link" onClick={() => navigate(`/procesos/${row.original.id}`)}>{getValue()}</button> }),
     helper.accessor('nombre_proceso', { header: 'Trámite', cell: ({ row, getValue }) => <div className="process-cell"><strong>{getValue()}</strong><span>{row.original.responsable_principal}</span></div> }),
@@ -35,17 +58,17 @@ export function ProcessTable({ onEdit }: { onEdit: (process: Process) => void })
     helper.display({ id: 'actions', cell: ({ row }) => <div className="row-actions">{canEditProcesses(role, userEmail) && <button onClick={() => onEdit(row.original)} title="Editar"><Pencil size={16} /></button>}{role === 'admin' && <button onClick={() => confirm('¿Archivar este trámite?') && void deleteProcess(row.original.id)} title="Archivar"><Trash2 size={16} /></button>}<button title="Más acciones"><MoreHorizontal size={17} /></button></div> }),
   ], [navigate, onEdit, deleteProcess, role, userEmail])
   const table = useReactTable({
-    data: filtered, columns, state: { sorting, globalFilter: search },
-    onSortingChange: setSorting, onGlobalFilterChange: setSearch,
+    data: filtered, columns, state: { sorting },
+    onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(), getSortedRowModel: getSortedRowModel(), getFilteredRowModel: getFilteredRowModel(),
   })
 
   return <div className="table-card">
     <div className="table-toolbar">
-      <div className="table-search"><Search size={17} /><Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar en trámites…" /></div>
+      <div className="table-search"><Search size={17} /><Input value={search} onChange={(event) => setGlobalSearch(event.target.value)} placeholder="Buscar en trámites…" /></div>
       <Select value={area} onChange={(event) => setArea(event.target.value)}><option value="">Todas las áreas</option>{areas.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}</Select>
       <Select value={status} onChange={(event) => setStatus(event.target.value)}><option value="">Todos los estados</option>{statuses.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}</Select>
-      <Button variant="ghost" onClick={() => { setSearch(''); setArea(''); setStatus('') }}>Limpiar</Button>
+      <Button variant="ghost" onClick={() => { setGlobalSearch(''); setArea(''); setStatus('') }}>Limpiar</Button>
     </div>
     <div className="table-scroll"><table><thead>{table.getHeaderGroups().map((group) => <tr key={group.id}>{group.headers.map((header) => <th key={header.id} onClick={header.column.getToggleSortingHandler()}>{flexRender(header.column.columnDef.header, header.getContext())}{header.column.getCanSort() && <ArrowUpDown size={13} />}</th>)}</tr>)}</thead>
       <tbody>{table.getRowModel().rows.map((row) => <tr key={row.id}>{row.getVisibleCells().map((cell) => <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>)}</tbody>

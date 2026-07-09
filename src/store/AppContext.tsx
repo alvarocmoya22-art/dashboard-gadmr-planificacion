@@ -1,7 +1,7 @@
 ﻿import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { areas as demoAreas, demoProcesses, priorities as demoPriorities, processTypes as demoTypes, statuses as demoStatuses } from '../data/tramites'
-import { deriveProcess, uid } from '../lib/utils'
+import { deriveProcess, repairMojibake, uid } from '../lib/utils'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
 import type { CatalogItem, ChangeLog, Process, ProcessFormData, Role } from '../types'
 
@@ -19,14 +19,30 @@ interface AppState {
   userEmail: string
   userAreaName: string
   canAccessManagement: boolean
+  globalSearch: string
+  setGlobalSearch: (value: string) => void
   saveProcess: (data: ProcessFormData, current?: Process) => Promise<void>
   deleteProcess: (id: string) => Promise<void>
   importProcesses: (rows: ProcessFormData[]) => Promise<number>
-  addCatalogItem: (kind: 'areas' | 'processTypes' | 'statuses' | 'priorities', name: string) => void
+  addCatalogItem: (kind: CatalogKind, name: string) => Promise<void>
+  updateCatalogItem: (kind: CatalogKind, id: string, name: string) => Promise<void>
+  deleteCatalogItem: (kind: CatalogKind, id: string) => Promise<void>
 }
 
 const AppContext = createContext<AppState | null>(null)
 const storageKey = 'tramites-varios-processes-v1'
+type CatalogKind = 'areas' | 'processTypes' | 'statuses' | 'priorities'
+
+const catalogTables: Record<CatalogKind, 'areas' | 'process_types' | 'process_statuses' | 'priorities'> = {
+  areas: 'areas',
+  processTypes: 'process_types',
+  statuses: 'process_statuses',
+  priorities: 'priorities',
+}
+
+function cleanCatalogs(items: CatalogItem[]) {
+  return items.map((item) => ({ ...item, nombre: repairMojibake(item.nombre) }))
+}
 
 function hydrate(process: Process, areas: CatalogItem[], types: CatalogItem[], statuses: CatalogItem[], priorities: CatalogItem[]) {
   return deriveProcess({
@@ -50,6 +66,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [userName, setUserName] = useState(isSupabaseConfigured ? 'Usuario institucional' : 'Administrador demo')
   const [userEmail, setUserEmail] = useState('')
   const [userAreaId, setUserAreaId] = useState<string | null>(null)
+  const [globalSearch, setGlobalSearch] = useState('')
 
   useEffect(() => {
     async function load() {
@@ -74,14 +91,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
         supabase.from('process_statuses').select('*').eq('activo', true).order('orden'),
         supabase.from('priorities').select('*').eq('activo', true).order('orden'),
       ])
-      const nextAreas = areaResult.data ?? []
-      const nextTypes = typeResult.data ?? []
-      const nextStatuses = statusResult.data ?? []
-      const nextPriorities = priorityResult.data ?? []
+      const nextAreas = cleanCatalogs(areaResult.data ?? [])
+      const nextTypes = cleanCatalogs(typeResult.data ?? [])
+      const nextStatuses = cleanCatalogs(statusResult.data ?? [])
+      const nextPriorities = cleanCatalogs(priorityResult.data ?? [])
       setAreas(nextAreas); setProcessTypes(nextTypes); setStatuses(nextStatuses); setPriorities(nextPriorities)
       const result = await supabase.from('processes').select('*, area:areas(*), tipo:process_types(*), estado:process_statuses(*), prioridad:priorities(*)').eq('activo', true).order('updated_at', { ascending: false })
       if (result.error) toast.error(result.error.message)
       setProcesses((result.data ?? []).map(deriveProcess))
+      const logResult = await supabase.from('process_change_log').select('*').order('created_at', { ascending: false }).limit(80)
+      if (!logResult.error) {
+        setLogs((logResult.data ?? []).map((item) => ({ ...item, usuario: 'Sistema' })))
+      }
       setLoading(false)
     }
     void load()
@@ -94,6 +115,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
       toast.info('Un trámite fue actualizado. Sincronizando…')
       client.from('processes').select('*, area:areas(*), tipo:process_types(*), estado:process_statuses(*), prioridad:priorities(*)').eq('activo', true)
         .then(({ data }) => data && setProcesses(data.map(deriveProcess)))
+    }).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'process_change_log' }, (payload) => {
+      const log = { ...(payload.new as ChangeLog), usuario: 'Sistema' }
+      setLogs((old) => [log, ...old].slice(0, 80))
+      if (log.campo === 'estado_id') toast.info('Un trámite cambió de estado. Revisa la campana de notificaciones.')
     }).subscribe()
     return () => { void client.removeChannel(channel) }
   }, [])
@@ -172,13 +197,47 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return rows.length
   }
 
-  function addCatalogItem(kind: 'areas' | 'processTypes' | 'statuses' | 'priorities', nombre: string) {
-    const item = { id: uid(), nombre, activo: true }
-    if (kind === 'areas') setAreas((old) => [...old, item])
-    if (kind === 'processTypes') setProcessTypes((old) => [...old, item])
-    if (kind === 'statuses') setStatuses((old) => [...old, item])
-    if (kind === 'priorities') setPriorities((old) => [...old, item])
+  function setCatalogState(kind: CatalogKind, updater: (old: CatalogItem[]) => CatalogItem[]) {
+    if (kind === 'areas') setAreas(updater)
+    if (kind === 'processTypes') setProcessTypes(updater)
+    if (kind === 'statuses') setStatuses(updater)
+    if (kind === 'priorities') setPriorities(updater)
+  }
+
+  async function addCatalogItem(kind: CatalogKind, nombre: string) {
+    const cleanName = repairMojibake(nombre).trim()
+    if (!cleanName) return
+    if (supabase) {
+      const payload: Partial<CatalogItem> = { nombre: cleanName, activo: true }
+      if (kind === 'statuses' || kind === 'priorities') payload.orden = (kind === 'statuses' ? statuses.length : priorities.length) + 1
+      const { data, error } = await supabase.from(catalogTables[kind]).insert(payload).select('*').single()
+      if (error) throw error
+      if (data) setCatalogState(kind, (old) => [...old, { ...data, nombre: repairMojibake(data.nombre) }])
+    } else {
+      const item = { id: uid(), nombre: cleanName, activo: true }
+      setCatalogState(kind, (old) => [...old, item])
+    }
     toast.success('Catálogo actualizado')
+  }
+
+  async function updateCatalogItem(kind: CatalogKind, id: string, nombre: string) {
+    const cleanName = repairMojibake(nombre).trim()
+    if (!cleanName) return
+    if (supabase) {
+      const { error } = await supabase.from(catalogTables[kind]).update({ nombre: cleanName }).eq('id', id)
+      if (error) throw error
+    }
+    setCatalogState(kind, (old) => old.map((item) => item.id === id ? { ...item, nombre: cleanName } : item))
+    toast.success('Catálogo actualizado')
+  }
+
+  async function deleteCatalogItem(kind: CatalogKind, id: string) {
+    if (supabase) {
+      const { error } = await supabase.from(catalogTables[kind]).update({ activo: false }).eq('id', id)
+      if (error) throw error
+    }
+    setCatalogState(kind, (old) => old.filter((item) => item.id !== id))
+    toast.success('Elemento archivado')
   }
 
   const userAreaName = areas.find((item) => item.id === userAreaId)?.nombre ?? ''
@@ -186,9 +245,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(() => ({
     processes, areas, processTypes, statuses, priorities, logs, loading,
-    demoMode: !isSupabaseConfigured, role, userName, userEmail, userAreaName, canAccessManagement,
-    saveProcess, deleteProcess, importProcesses, addCatalogItem,
-  }), [processes, areas, processTypes, statuses, priorities, logs, loading, role, userName, userEmail, userAreaName, canAccessManagement])
+    demoMode: !isSupabaseConfigured, role, userName, userEmail, userAreaName, canAccessManagement, globalSearch, setGlobalSearch,
+    saveProcess, deleteProcess, importProcesses, addCatalogItem, updateCatalogItem, deleteCatalogItem,
+  }), [processes, areas, processTypes, statuses, priorities, logs, loading, role, userName, userEmail, userAreaName, canAccessManagement, globalSearch])
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
 }

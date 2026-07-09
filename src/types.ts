@@ -51,8 +51,8 @@ export interface ChangeLog {
   id: string
   process_id: string
   campo: string
-  valor_anterior?: string
-  valor_nuevo?: string
+  valor_anterior?: unknown
+  valor_nuevo?: unknown
   usuario: string
   created_at: string
 }
