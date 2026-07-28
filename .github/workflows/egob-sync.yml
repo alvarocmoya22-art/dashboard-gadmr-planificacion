@@ -14,8 +14,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
-      - name: Descargar código
+      - name: Descargar codigo
         uses: actions/checkout@v4
+
+      - name: Instalar pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.30.3
 
       - name: Configurar Node.js
         uses: actions/setup-node@v4
@@ -24,13 +29,10 @@ jobs:
           cache: pnpm
           cache-dependency-path: pnpm-lock.yaml
 
-      - name: Instalar pnpm
-        run: npm install -g pnpm@10.30.3
-
       - name: Instalar dependencias
         run: pnpm install --frozen-lockfile
 
-      - name: Ejecutar sincronización eGob
+      - name: Ejecutar sincronizacion eGob
         run: node scripts/github-egob-sync-all.mjs
         env:
           SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
