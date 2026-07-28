@@ -11,7 +11,19 @@ import { getEgobIssueNumber, getEgobIssueUrl } from '../lib/egob'
 
 const helper = createColumnHelper<Process>()
 
-export function ProcessTable({ onEdit }: { onEdit: (process: Process) => void }) {
+type ProcessTableFilter = 'active' | 'review'
+
+function isFinalized(process: Process) {
+  return process.estado?.nombre === 'Finalizado'
+}
+
+function isDueForReview(process: Process) {
+  if (!process.fecha_proxima_revision || isFinalized(process)) return false
+  const today = new Date().toISOString().slice(0, 10)
+  return process.fecha_proxima_revision <= today
+}
+
+export function ProcessTable({ onEdit, view = 'active' }: { onEdit: (process: Process) => void; view?: ProcessTableFilter }) {
   const { processes, deleteProcess, statuses, areas, role, userEmail, globalSearch, setGlobalSearch } = useApp()
   const [sorting, setSorting] = useState<SortingState>([])
   const [status, setStatus] = useState('')
@@ -21,6 +33,8 @@ export function ProcessTable({ onEdit }: { onEdit: (process: Process) => void })
   const filtered = useMemo(() => {
     const query = normalizeText(search).toLocaleLowerCase('es')
     return processes.filter((process) => {
+      if (isFinalized(process)) return false
+      if (view === 'review' && !isDueForReview(process)) return false
       const matchesFilters = (!status || process.estado_id === status) && (!area || process.area_id === area)
       if (!matchesFilters) return false
       if (!query) return true
@@ -41,7 +55,7 @@ export function ProcessTable({ onEdit }: { onEdit: (process: Process) => void })
       ].map(normalizeText).join(' ').toLocaleLowerCase('es')
       return text.includes(query)
     })
-  }, [processes, status, area, search])
+  }, [processes, status, area, search, view])
   const columns = useMemo(() => [
     helper.accessor('codigo_proceso', { header: 'Código', cell: ({ row, getValue }) => <button className="code-link" onClick={() => navigate(`/procesos/${row.original.id}`)}>{getValue()}</button> }),
     helper.accessor('nombre_proceso', { header: 'Trámite', cell: ({ row, getValue }) => <div className="process-cell"><strong>{getValue()}</strong><span>{row.original.responsable_principal}</span></div> }),
@@ -73,6 +87,6 @@ export function ProcessTable({ onEdit }: { onEdit: (process: Process) => void })
     <div className="table-scroll"><table><thead>{table.getHeaderGroups().map((group) => <tr key={group.id}>{group.headers.map((header) => <th key={header.id} onClick={header.column.getToggleSortingHandler()}>{flexRender(header.column.columnDef.header, header.getContext())}{header.column.getCanSort() && <ArrowUpDown size={13} />}</th>)}</tr>)}</thead>
       <tbody>{table.getRowModel().rows.map((row) => <tr key={row.id}>{row.getVisibleCells().map((cell) => <td key={cell.id}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>)}</tr>)}</tbody>
     </table></div>
-    <div className="table-footer"><span>{table.getRowModel().rows.length} de {processes.length} trámites</span><span>Datos actualizados en tiempo real</span></div>
+    <div className="table-footer"><span>{table.getRowModel().rows.length} trámites activos visibles</span><span>{view === 'review' ? 'Mostrando revisiones vencidas o para hoy' : 'Los finalizados quedan fuera de la tabla operativa'}</span></div>
   </div>
 }

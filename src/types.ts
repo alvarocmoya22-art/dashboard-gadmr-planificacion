@@ -57,6 +57,16 @@ export interface ChangeLog {
   created_at: string
 }
 
+export interface ProcessComment {
+  id: string
+  process_id: string
+  contenido: string
+  created_by?: string
+  created_at: string
+  updated_at?: string
+  usuario?: string
+}
+
 export interface ProcessFormData {
   area_id: string
   tipo_proceso_id: string

@@ -1,10 +1,10 @@
-﻿import { useMemo } from 'react'
-import { AlertTriangle, ArrowRight, BriefcaseBusiness, CalendarClock, CheckCircle2, CircleGauge, Flag, Layers3, MoveUpRight } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { AlertTriangle, ArrowRight, BriefcaseBusiness, CalendarClock, CheckCircle2, CircleGauge, Flag, Layers3, MoveUpRight, Search } from 'lucide-react'
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Link } from 'react-router-dom'
 import { Card, Badge } from '../components/ui'
 import { useApp } from '../store/AppContext'
-import { formatDate } from '../lib/utils'
+import { formatDate, normalizeText } from '../lib/utils'
 
 function shortAreaLabel(value: string) {
   const labels: Record<string, string> = {
@@ -18,6 +18,7 @@ function shortAreaLabel(value: string) {
 
 export function Dashboard() {
   const { processes } = useApp()
+  const [portfolioSearch, setPortfolioSearch] = useState('')
   const metrics = useMemo(() => {
     const active = processes.filter((item) => item.estado?.nombre !== 'Finalizado')
     const finished = processes.filter((item) => item.estado?.nombre === 'Finalizado')
@@ -38,8 +39,28 @@ export function Dashboard() {
     acc[name].procesos += 1; acc[name].total += item.porcentaje_avance; acc[name].avance = Math.round(acc[name].total / acc[name].procesos)
     return acc
   }, {})).slice(0, 6), [processes])
-  const critical = processes.filter((item) => item.requiere_accion_gerencial || item.semaforo === 'Rojo' || item.prioridad?.nombre === 'Alta')
-  const criticalPreview = critical.slice(0, 4)
+  const executivePortfolio = processes
+    .filter((item) => item.estado?.nombre !== 'Finalizado')
+    .sort((a, b) => {
+      const priorityScore = (item: typeof a) => item.semaforo === 'Rojo' ? 0 : item.prioridad?.nombre === 'Alta' ? 1 : item.semaforo === 'Amarillo' ? 2 : 3
+      return priorityScore(a) - priorityScore(b) || String(a.fecha_fin_programada ?? '').localeCompare(String(b.fecha_fin_programada ?? ''))
+    })
+  const executiveQuery = normalizeText(portfolioSearch).toLocaleLowerCase('es')
+  const executiveFiltered = executivePortfolio.filter((process) => {
+    if (!executiveQuery) return true
+    const text = [
+      process.codigo_proceso,
+      process.nombre_proceso,
+      process.responsable_principal,
+      process.responsable_secundario,
+      process.area?.nombre,
+      process.egob_numero,
+      process.egob_responsable_actual,
+      process.proxima_accion,
+    ].map((value) => normalizeText(value ?? '')).join(' ').toLocaleLowerCase('es')
+    return text.includes(executiveQuery)
+  })
+  const executivePreview = executiveFiltered.slice(0, 6)
 
   const kpis = [
     { label: 'Trámites activos', value: metrics.active.length, note: `${processes.length} en seguimiento`, icon: BriefcaseBusiness, tone: 'teal' },
@@ -53,13 +74,13 @@ export function Dashboard() {
     <section className="kpi-grid">{kpis.map(({ label, value, note, icon: Icon, tone }) => <Card className={`kpi-card tone-${tone}`} key={label}><div className="kpi-icon"><Icon size={20} /></div><div><span>{label}</span><strong>{value}</strong><small>{note}</small></div></Card>)}</section>
     <section className="attention-banner">
       <div className="attention-icon"><Flag size={22} /></div>
-      <div><p className="eyebrow">Qué requiere atención hoy</p><h2>{critical.length ? `${critical.length} trámites necesitan una decisión o seguimiento cercano` : 'La operación está bajo control'}</h2><p>Priorizamos vencimientos, alta prioridad y solicitudes explícitas de acción gerencial.</p></div>
+      <div><p className="eyebrow">Qué requiere atención hoy</p><h2>{metrics.overdue.length || metrics.expiring.length ? `${metrics.overdue.length + metrics.expiring.length} trámites necesitan seguimiento cercano` : 'La operación está bajo control'}</h2><p>Priorizamos vencimientos, alta prioridad y solicitudes explícitas de acción gerencial.</p></div>
       <Link to="/alertas">Revisar alertas <ArrowRight size={17} /></Link>
     </section>
     <section className="chart-grid">
       <Card className="chart-card"><div className="card-heading"><div><p className="eyebrow">Distribución</p><h3>Trámites por estado</h3></div><Layers3 size={20} /></div><div className="donut-wrap"><ResponsiveContainer width="100%" height={260}><PieChart><Pie data={statusData} dataKey="value" nameKey="name" innerRadius={70} outerRadius={100} paddingAngle={4}>{statusData.map((item) => <Cell key={item.name} fill={item.color} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer><div className="donut-center"><strong>{processes.length}</strong><span>Total</span></div></div><div className="legend">{statusData.map((item) => <span key={item.name}><i style={{ background: item.color }} />{item.name}<b>{item.value}</b></span>)}</div></Card>
       <Card className="chart-card wide"><div className="card-heading"><div><p className="eyebrow">Desempeño</p><h3>Avance promedio por área</h3></div><MoveUpRight size={20} /></div><ResponsiveContainer width="100%" height={300}><BarChart data={areaData} margin={{ left: 0, right: 10, top: 15, bottom: 10 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e9e7" /><XAxis dataKey="name" tick={{ fontSize: 9 }} tickFormatter={shortAreaLabel} interval={0} minTickGap={4} axisLine={false} tickLine={false} /><YAxis domain={[0, 100]} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><Tooltip formatter={(value) => `${value}%`} /><Bar dataKey="avance" fill="#0f766e" radius={[7, 7, 0, 0]} maxBarSize={48} /></BarChart></ResponsiveContainer></Card>
     </section>
-    <section className="critical-section"><div className="section-title"><div><p className="eyebrow">Foco ejecutivo</p><h2>Trámites críticos</h2></div><Link to="/procesos">Ver portafolio completo <ArrowRight size={16} /></Link></div><div className="critical-list">{criticalPreview.map((process) => <Link className="critical-row" to={`/procesos/${process.id}`} key={process.id}><span className={`traffic traffic-${process.semaforo?.toLowerCase()}`} /><div className="critical-main"><small>{process.codigo_proceso} · {process.area?.nombre}</small><strong>{process.nombre_proceso}</strong><span>Próxima acción: {process.proxima_accion || 'No definida'}</span></div><div className="critical-meta"><Badge color={process.prioridad?.color}>{process.prioridad?.nombre}</Badge><span>{formatDate(process.fecha_fin_programada)}</span></div><ArrowRight size={17} /></Link>)}</div></section>
+    <section className="critical-section"><div className="section-title"><div><p className="eyebrow">Foco ejecutivo</p><h2>Trámites en seguimiento</h2><span>{executivePortfolio.length} trámites activos alimentados desde la vista operativa · se muestran 6 por defecto</span></div><Link to="/procesos">Ver portafolio completo <ArrowRight size={16} /></Link></div><div className="executive-search"><Search size={16} /><input value={portfolioSearch} onChange={(event) => setPortfolioSearch(event.target.value)} placeholder="Buscar trámite, código, área, responsable o eGob…" /></div><div className="critical-list">{executivePreview.length ? executivePreview.map((process) => <Link className="critical-row" to={`/procesos/${process.id}`} key={process.id}><span className={`traffic traffic-${process.semaforo?.toLowerCase()}`} /><div className="critical-main"><small>{process.codigo_proceso} · {process.area?.nombre}</small><strong>{process.nombre_proceso}</strong><span>Actualmente con eGob: {process.egob_responsable_actual || 'Pendiente de sincronizar'} · Próxima acción: {process.proxima_accion || 'No definida'}</span></div><div className="critical-meta"><Badge color={process.prioridad?.color}>{process.prioridad?.nombre}</Badge><span>{formatDate(process.fecha_fin_programada)}</span></div><ArrowRight size={17} /></Link>) : <p className="all-clear">No se encontraron trámites con ese criterio.</p>}</div></section>
   </div>
 }

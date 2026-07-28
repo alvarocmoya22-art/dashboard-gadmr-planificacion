@@ -1,0 +1,42 @@
+name: Sincronizar eGob
+
+on:
+  # Ecuador es UTC-5. 07:00 Ecuador = 12:00 UTC.
+  schedule:
+    - cron: '0 12 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Descargar código
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+
+      - name: Instalar pnpm
+        run: npm install -g pnpm@10.30.3
+
+      - name: Instalar dependencias
+        run: pnpm install --frozen-lockfile
+
+      - name: Ejecutar sincronización eGob
+        run: node scripts/github-egob-sync-all.mjs
+        env:
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          EGOB_USERNAME: ${{ secrets.EGOB_USERNAME }}
+          EGOB_PASSWORD: ${{ secrets.EGOB_PASSWORD }}
+          EGOB_BASE_URL: ${{ secrets.EGOB_BASE_URL }}
+          EGOB_LOGIN_URL: ${{ secrets.EGOB_LOGIN_URL }}
+          EGOB_TLS_REJECT_UNAUTHORIZED: ${{ secrets.EGOB_TLS_REJECT_UNAUTHORIZED }}

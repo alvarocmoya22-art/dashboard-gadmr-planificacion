@@ -3,7 +3,7 @@ import { toast } from 'sonner'
 import { areas as demoAreas, demoProcesses, priorities as demoPriorities, processTypes as demoTypes, statuses as demoStatuses } from '../data/tramites'
 import { deriveProcess, repairMojibake, uid } from '../lib/utils'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
-import type { CatalogItem, ChangeLog, Process, ProcessFormData, Role } from '../types'
+import type { CatalogItem, ChangeLog, Process, ProcessComment, ProcessFormData, Role } from '../types'
 
 interface AppState {
   processes: Process[]
@@ -12,6 +12,7 @@ interface AppState {
   statuses: CatalogItem[]
   priorities: CatalogItem[]
   logs: ChangeLog[]
+  comments: ProcessComment[]
   loading: boolean
   demoMode: boolean
   role: Role
@@ -23,6 +24,7 @@ interface AppState {
   setGlobalSearch: (value: string) => void
   saveProcess: (data: ProcessFormData, current?: Process) => Promise<void>
   deleteProcess: (id: string) => Promise<void>
+  addComment: (processId: string, contenido: string) => Promise<void>
   importProcesses: (rows: ProcessFormData[]) => Promise<number>
   addCatalogItem: (kind: CatalogKind, name: string) => Promise<void>
   updateCatalogItem: (kind: CatalogKind, id: string, name: string) => Promise<void>
@@ -61,6 +63,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [statuses, setStatuses] = useState(demoStatuses)
   const [priorities, setPriorities] = useState(demoPriorities)
   const [logs, setLogs] = useState<ChangeLog[]>([])
+  const [comments, setComments] = useState<ProcessComment[]>([])
   const [loading, setLoading] = useState(true)
   const [role, setRole] = useState<Role>('admin')
   const [userName, setUserName] = useState(isSupabaseConfigured ? 'Usuario institucional' : 'Administrador demo')
@@ -103,6 +106,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (!logResult.error) {
         setLogs((logResult.data ?? []).map((item) => ({ ...item, usuario: 'Sistema' })))
       }
+      const commentResult = await supabase
+        .from('process_comments')
+        .select('id,process_id,contenido,created_by,created_at,updated_at')
+        .order('created_at', { ascending: false })
+        .limit(200)
+      if (!commentResult.error) {
+        setComments((commentResult.data ?? []).map((item) => ({
+          ...item,
+          contenido: repairMojibake(item.contenido),
+          usuario: 'Usuario institucional',
+        })))
+      }
       setLoading(false)
     }
     void load()
@@ -119,6 +134,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
       const log = { ...(payload.new as ChangeLog), usuario: 'Sistema' }
       setLogs((old) => [log, ...old].slice(0, 80))
       if (log.campo === 'estado_id') toast.info('Un trámite cambió de estado. Revisa la campana de notificaciones.')
+    }).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'process_comments' }, (payload) => {
+      const comment = payload.new as ProcessComment
+      setComments((old) => [{ ...comment, contenido: repairMojibake(comment.contenido), usuario: 'Usuario institucional' }, ...old].slice(0, 200))
     }).subscribe()
     return () => { void client.removeChannel(channel) }
   }, [])
@@ -192,6 +210,32 @@ export function AppProvider({ children }: { children: ReactNode }) {
     toast.success('Trámite archivado')
   }
 
+  async function addComment(processId: string, contenido: string) {
+    const cleanContent = repairMojibake(contenido).trim()
+    if (!cleanContent) return
+    if (supabase) {
+      const { data: authData } = await supabase.auth.getUser()
+      const createdBy = authData.user?.id
+      if (!createdBy) throw new Error('Debes iniciar sesión para publicar comentarios.')
+      const { data, error } = await supabase
+        .from('process_comments')
+        .insert({ process_id: processId, contenido: cleanContent, created_by: createdBy })
+        .select('id,process_id,contenido,created_by,created_at,updated_at')
+        .single()
+      if (error) throw error
+      if (data) setComments((old) => [{ ...data, contenido: repairMojibake(data.contenido), usuario: userName }, ...old].slice(0, 200))
+    } else {
+      setComments((old) => [{
+        id: uid(),
+        process_id: processId,
+        contenido: cleanContent,
+        usuario: userName,
+        created_at: new Date().toISOString(),
+      }, ...old].slice(0, 200))
+    }
+    toast.success('Comentario publicado')
+  }
+
   async function importProcesses(rows: ProcessFormData[]) {
     for (const row of rows) await saveProcess(row)
     return rows.length
@@ -244,10 +288,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const canAccessManagement = role === 'admin' || role === 'gerente' || userAreaName.trim().toLowerCase() === 'gerencia general'
 
   const value = useMemo(() => ({
-    processes, areas, processTypes, statuses, priorities, logs, loading,
+    processes, areas, processTypes, statuses, priorities, logs, comments, loading,
     demoMode: !isSupabaseConfigured, role, userName, userEmail, userAreaName, canAccessManagement, globalSearch, setGlobalSearch,
-    saveProcess, deleteProcess, importProcesses, addCatalogItem, updateCatalogItem, deleteCatalogItem,
-  }), [processes, areas, processTypes, statuses, priorities, logs, loading, role, userName, userEmail, userAreaName, canAccessManagement, globalSearch])
+    saveProcess, deleteProcess, addComment, importProcesses, addCatalogItem, updateCatalogItem, deleteCatalogItem,
+  }), [processes, areas, processTypes, statuses, priorities, logs, comments, loading, role, userName, userEmail, userAreaName, canAccessManagement, globalSearch])
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
 }

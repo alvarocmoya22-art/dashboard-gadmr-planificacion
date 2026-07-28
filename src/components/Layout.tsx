@@ -1,8 +1,8 @@
 import { useMemo, useState, type ReactNode } from 'react'
-import { NavLink, useLocation } from 'react-router-dom'
+import { NavLink, useLocation, useNavigate } from 'react-router-dom'
 import { Bell, BookOpen, ChartNoAxesCombined, ChevronLeft, FileUp, KanbanSquare, LayoutDashboard, LogOut, Menu, Search, Settings2, TableProperties, X } from 'lucide-react'
 import { useApp } from '../store/AppContext'
-import { cn } from '../lib/utils'
+import { cn, formatDate, repairMojibake, todayIso } from '../lib/utils'
 import { supabase } from '../lib/supabase'
 
 const nav = [
@@ -29,25 +29,63 @@ export function Layout({ children }: { children: ReactNode }) {
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [seenNotifications, setSeenNotifications] = useState(() => Number(localStorage.getItem('status-notifications-seen') || 0))
   const { pathname } = useLocation()
+  const navigate = useNavigate()
   const { demoMode, userName, role, canAccessManagement, globalSearch, setGlobalSearch, logs, processes, statuses } = useApp()
   const visibleNav = canAccessManagement ? nav : nav.filter((item) => item.to === '/procesos')
   const [title, description] = titles[pathname] ?? ['Detalle del trámite', 'Trazabilidad completa del trámite institucional.']
   const showGlobalSearch = pathname === '/procesos'
   const signOut = async () => { await supabase?.auth.signOut() }
-  const statusNotifications = useMemo(() => logs
-    .filter((item) => item.campo === 'estado_id')
-    .slice(0, 8)
-    .map((item) => {
-      const process = processes.find((processItem) => processItem.id === item.process_id)
-      const oldStatus = statuses.find((status) => status.id === String(item.valor_anterior ?? ''))?.nombre ?? 'Sin estado'
-      const newStatus = statuses.find((status) => status.id === String(item.valor_nuevo ?? ''))?.nombre ?? 'Sin estado'
-      return { ...item, process, oldStatus, newStatus }
-    }), [logs, processes, statuses])
-  const unreadNotifications = Math.max(0, statusNotifications.length - seenNotifications)
+
+  const notifications = useMemo(() => {
+    const statusItems = logs
+      .filter((item) => item.campo === 'estado_id')
+      .slice(0, 6)
+      .map((item) => {
+        const process = processes.find((processItem) => processItem.id === item.process_id)
+        const oldStatus = statuses.find((status) => status.id === String(item.valor_anterior ?? ''))?.nombre ?? 'Sin estado'
+        const newStatus = statuses.find((status) => status.id === String(item.valor_nuevo ?? ''))?.nombre ?? 'Sin estado'
+        return {
+          id: item.id,
+          process,
+          title: 'Cambio de estado',
+          detail: `${oldStatus} → ${newStatus}`,
+          created_at: item.created_at,
+        }
+      })
+
+    const egobItems = logs
+      .filter((item) => String(item.campo).startsWith('egob_'))
+      .slice(0, 6)
+      .map((item) => {
+        const process = processes.find((processItem) => processItem.id === item.process_id)
+        return {
+          id: item.id,
+          process,
+          title: 'Movimiento eGob detectado',
+          detail: `${repairMojibake(String(item.valor_anterior ?? 'Pendiente'))} → ${repairMojibake(String(item.valor_nuevo ?? 'Actualizado'))}`,
+          created_at: item.created_at,
+        }
+      })
+
+    const reviewItems = processes
+      .filter((process) => process.estado?.nombre !== 'Finalizado' && Boolean(process.fecha_proxima_revision) && String(process.fecha_proxima_revision) <= todayIso())
+      .slice(0, 6)
+      .map((process) => ({
+        id: `review-${process.id}`,
+        process,
+        title: 'Revisión interna pendiente',
+        detail: `Próxima revisión: ${formatDate(process.fecha_proxima_revision)}`,
+        created_at: process.fecha_proxima_revision || process.updated_at,
+      }))
+
+    return [...reviewItems, ...egobItems, ...statusItems].slice(0, 12)
+  }, [logs, processes, statuses])
+
+  const unreadNotifications = Math.max(0, notifications.length - seenNotifications)
 
   function toggleNotifications() {
     setNotificationsOpen((value) => !value)
-    const nextSeen = statusNotifications.length
+    const nextSeen = notifications.length
     setSeenNotifications(nextSeen)
     localStorage.setItem('status-notifications-seen', String(nextSeen))
   }
@@ -78,13 +116,13 @@ export function Layout({ children }: { children: ReactNode }) {
           <div className="notification-wrap">
             <button title="Notificaciones" className="notification-button" onClick={toggleNotifications}><Bell size={19} />{unreadNotifications > 0 && <i />}</button>
             {notificationsOpen && <div className="notification-panel">
-              <header><strong>Notificaciones</strong><span>{statusNotifications.length} cambios de estado</span></header>
-              {statusNotifications.length ? statusNotifications.map((item) => <button key={item.id} className="notification-row" onClick={() => { setNotificationsOpen(false); if (item.process) window.location.href = `/procesos/${item.process.id}` }}>
-                <span>{item.process?.codigo_proceso ?? 'Trámite'}</span>
+              <header><strong>Notificaciones</strong><span>{notifications.length} novedades</span></header>
+              {notifications.length ? notifications.map((item) => <button key={item.id} className="notification-row" onClick={() => { setNotificationsOpen(false); if (item.process) navigate(`/procesos/${item.process.id}`) }}>
+                <span>{item.title} · {item.process?.codigo_proceso ?? 'Trámite'}</span>
                 <strong>{item.process?.nombre_proceso ?? 'Trámite actualizado'}</strong>
-                <small>{item.oldStatus} → {item.newStatus}</small>
+                <small>{item.detail}</small>
                 <em>{new Date(item.created_at).toLocaleString('es-EC')}</em>
-              </button>) : <p>No hay cambios de estado registrados todavía.</p>}
+              </button>) : <p>No hay novedades registradas todavía.</p>}
             </div>}
           </div>
           <div className="user-chip"><div className="avatar">AG</div><div><strong>{userName}</strong><small>{role}</small></div></div>
