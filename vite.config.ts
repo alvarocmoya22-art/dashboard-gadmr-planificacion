@@ -44,8 +44,10 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   Object.assign(process.env, env)
 
+  const basePath = env.VITE_BASE_PATH || (mode === 'production' ? '/ep-movilidad-riobamba/' : '/')
+
   return {
-    base: env.VITE_BASE_PATH || '/',
+    base: basePath,
     plugins: [localNetlifyFunctions(), react()],
     server: { port: 5173, host: '0.0.0.0' },
   }
