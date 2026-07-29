@@ -39,7 +39,7 @@ jobs:
       - name: Compilar aplicacion
         run: pnpm run build
         env:
-          VITE_BASE_PATH: /ep-movilidad-riobamba/
+          VITE_BASE_PATH: /dashboard-gadmr-planificacion/
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 

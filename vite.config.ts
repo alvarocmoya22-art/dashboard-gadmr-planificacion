@@ -44,7 +44,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   Object.assign(process.env, env)
 
-  const basePath = env.VITE_BASE_PATH || (mode === 'production' ? '/ep-movilidad-riobamba/' : '/')
+  const basePath = env.VITE_BASE_PATH || (mode === 'production' ? '/dashboard-gadmr-planificacion/' : '/')
 
   return {
     base: basePath,
