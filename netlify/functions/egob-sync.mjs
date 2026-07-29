@@ -18,11 +18,11 @@ function knownIssueData(issue) {
       asunto: 'SOLICITA LA DESMEMBRACION DE LOTE DEL SR. FAUSTO GUAÑO N° 0012351',
       estado: 'Nuevo',
       prioridad: '',
-      responsable_actual: 'MARIA ALEJANDRA BONIFAZ LÓPEZ',
-      ultimo_movimiento: '2026-06-23 11:44 - Reasignación a MARIA ALEJANDRA BONIFAZ LÓPEZ',
-      actualizado_en: '2026-06-23 11:44',
-      tramites_hijos: [],
-      tramites_revisados: ['1120463'],
+      responsable_actual: 'NATALIA ELIZABETH SUBIA ANDRADE',
+      ultimo_movimiento: 'Trámite 1213878: 2026-07-28 11:31 - Reasignación a NATALIA ELIZABETH SUBIA ANDRADE',
+      actualizado_en: '2026-07-28 11:31',
+      tramites_hijos: ['1213878'],
+      tramites_revisados: ['1120463', '1213878'],
       sincronizado_en: new Date().toISOString(),
     }
   }
@@ -280,14 +280,8 @@ function parseLatestReassignmentByAssignmentLine(text) {
 
 
 function applyKnownIssueCorrections(issue, parsed) {
-  if (String(issue) === '1120463') {
-    return {
-      ...parsed,
-      responsable_actual: 'MARIA ALEJANDRA BONIFAZ LÓPEZ',
-      ultimo_movimiento: '2026-06-23 11:44 - Reasignación a MARIA ALEJANDRA BONIFAZ LÓPEZ',
-      actualizado_en: parsed.actualizado_en || '2026-06-23 11:44',
-    }
-  }
+  const known = knownIssueData(issue)
+  if (known && movementTime(known) > movementTime(parsed)) return { ...parsed, ...known }
   return parsed
 }
 function parseIssue(issue, html, finalUrl) {
@@ -377,11 +371,11 @@ async function readRelatedIssues(jar, rootIssue, linkedIssues, visited = new Set
 
 export async function loginAndReadIssue(issue) {
   const known = knownIssueData(issue)
-  if (known) return known
 
   const username = process.env.EGOB_USERNAME
   const password = process.env.EGOB_PASSWORD
   if (!username || !password) {
+    if (known) return known
     const error = new Error('Faltan EGOB_USERNAME y EGOB_PASSWORD en variables de entorno.')
     error.statusCode = 500
     throw error
