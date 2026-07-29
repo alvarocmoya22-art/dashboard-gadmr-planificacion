@@ -20,7 +20,8 @@ function getSupabaseAdmin() {
 function getIssueNumber(process) {
   const explicit = String(process.egob_numero || '').replace(/\D/g, '')
   if (explicit) return explicit
-  return String(process.documento_respaldo || '').match(/\b\d{5,}\b/)?.[0] || ''
+  const matches = [...String(process.documento_respaldo || '').matchAll(/\b\d{5,}\b/g)].map((match) => match[0])
+  return matches.at(-1) || ''
 }
 
 function changedPayload(process, egob) {
