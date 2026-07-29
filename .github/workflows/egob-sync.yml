@@ -1,9 +1,12 @@
 name: Sincronizar eGob
 
 on:
-  # Ecuador es UTC-5. 07:00 Ecuador = 12:00 UTC.
+  # Ecuador es UTC-5.
+  # 07:00 Ecuador = 12:00 UTC
+  # 12:00 Ecuador = 17:00 UTC
+  # 18:00 Ecuador = 23:00 UTC
   schedule:
-    - cron: '0 12 * * *'
+    - cron: '0 12,17,23 * * *'
   workflow_dispatch:
 
 permissions:
