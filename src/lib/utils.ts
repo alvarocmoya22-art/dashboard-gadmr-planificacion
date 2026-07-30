@@ -182,6 +182,22 @@ export function repairMojibake(value: unknown) {
     .replace(/Habilitación DE SUELO Y Edificación/g, 'HABILITACIÓN DE SUELO Y EDIFICACIÓN')
     .replace(/Dirección DE OBRAS Públicas/g, 'DIRECCIÓN DE OBRAS PÚBLICAS')
     .replace(/Diseño DE LA OBRA Pública/g, 'DISEÑO DE LA OBRA PÚBLICA')
+    .replace(/\bAVALUOS\b/g, 'AVALÚOS')
+    .replace(/\bAvaluos\b/g, 'Avalúos')
+    .replace(/\bHABITAT\b/g, 'HÁBITAT')
+    .replace(/\bHabitat\b/g, 'Hábitat')
+    .replace(/\bPUBLICA\b/g, 'PÚBLICA')
+    .replace(/\bPublica\b/g, 'Pública')
+    .replace(/\bPUBLICAS\b/g, 'PÚBLICAS')
+    .replace(/\bPublicas\b/g, 'Públicas')
+    .replace(/\btramite\b/g, 'trámite')
+    .replace(/\bTramite\b/g, 'Trámite')
+    .replace(/\bTRAMITE\b/g, 'TRÁMITE')
+    .replace(/\btramites\b/g, 'trámites')
+    .replace(/\bTramites\b/g, 'Trámites')
+    .replace(/\bTRAMITES\b/g, 'TRÁMITES')
+    .replace(/[\uFFFD\uFFFC�]+/g, '')
+    .replace(/\s{2,}/g, ' ')
 }
 
 export function normalizeText(value: unknown) {

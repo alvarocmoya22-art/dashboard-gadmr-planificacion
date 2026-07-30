@@ -104,15 +104,21 @@ export function Dashboard() {
         const egobUrl = getEgobIssueUrl(process)
         const latestComment = latestCommentByProcess[process.id]
         const latestAttachment = latestAttachmentByProcess[process.id]
+        const areaName = repairMojibake(process.area?.nombre ?? 'Sin área')
+        const processName = repairMojibake(process.nombre_proceso)
+        const egobOwner = repairMojibake(process.egob_responsable_actual || 'Pendiente de sincronizar')
+        const commentText = repairMojibake(latestComment || 'Sin comentario interno')
+        const movementText = repairMojibake(process.egob_ultimo_movimiento || 'Pendiente de sincronizar')
+        const attachmentName = repairMojibake(latestAttachment?.nombre_archivo || 'Sin adjunto cargado')
         return <article className="critical-row" key={process.id}>
           <span className={`traffic traffic-${process.semaforo?.toLowerCase()}`} />
           <div className="critical-main">
-            <small>{process.codigo_proceso} · {process.area?.nombre}</small>
-            <strong>{process.nombre_proceso}</strong>
-            <span className="executive-attachment-line"><Paperclip size={12} /> Último adjunto: {latestAttachment ? repairMojibake(latestAttachment.nombre_archivo) : 'Sin adjunto cargado'}</span>
-            <span>Actualmente con eGob: {process.egob_responsable_actual || 'Pendiente de sincronizar'}</span>
-            <span>Último comentario: {latestComment || 'Sin comentario interno'}</span>
-            <span>Último movimiento eGob: {process.egob_ultimo_movimiento || 'Pendiente de sincronizar'}</span>
+            <small>{process.codigo_proceso} · {areaName}</small>
+            <strong>{processName}</strong>
+            <span className="executive-info-line line-attachment"><Paperclip size={12} /><b>Último adjunto</b><em>{attachmentName}</em></span>
+            <span className="executive-info-line line-owner"><b>Actualmente con eGob</b><em>{egobOwner}</em></span>
+            <span className="executive-info-line line-comment"><b>Último comentario</b><em>{commentText}</em></span>
+            <span className="executive-info-line line-movement"><b>Último movimiento eGob</b><em>{movementText}</em></span>
           </div>
           <div className="critical-actions">
             <div className="critical-meta"><Badge color={process.prioridad?.color}>{process.prioridad?.nombre}</Badge><span>{formatDate(process.fecha_fin_programada)}</span></div>
@@ -122,7 +128,7 @@ export function Dashboard() {
               {latestAttachment ? <button className="attachment-open" type="button" onClick={() => void openAttachment(latestAttachment)}><FileText size={14} /> Abrir adjunto</button> : null}
             </div>
           </div>
-          <Link className="row-detail-link" to={`/procesos/${process.id}`} aria-label={`Ver detalle de ${process.nombre_proceso}`}><ArrowRight size={17} /></Link>
+          <Link className="row-detail-link" to={`/procesos/${process.id}`} aria-label={`Ver detalle de ${processName}`}><ArrowRight size={17} /></Link>
         </article>
       }) : <p className="all-clear">No se encontraron trámites con ese criterio.</p>}</div>
     </section>
