@@ -100,8 +100,6 @@ export function ProcessForm({ process, onClose }: { process?: Process; onClose: 
           <Field label="Estado" error={form.formState.errors.estado_id?.message}><Select {...form.register('estado_id')}><option value="">Seleccionar…</option>{statuses.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}</Select></Field>
           <Field label="Prioridad" error={form.formState.errors.prioridad_id?.message}><Select {...form.register('prioridad_id')}><option value="">Seleccionar…</option>{priorities.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}</Select></Field>
           <Field label={`Avance · ${progress}%`} className="span-2" error={form.formState.errors.porcentaje_avance?.message}><Input type="range" min="0" max="100" {...form.register('porcentaje_avance', { valueAsNumber: true })} /></Field>
-          <Field label="Dependencia externa"><Input {...form.register('dependencia_externa')} /></Field>
-          <Field label="Documento respaldo / URL"><Input {...form.register('documento_respaldo')} /></Field>
           <Field label="Nro. trámite eGob / eDoc"><Input placeholder="Ej. 970395" {...form.register('egob_numero')} /></Field>
           <Field label="URL eGob / eDoc"><Input placeholder="https://egobedoc.gadmriobamba.gob.ec:8081/issues/970395" {...form.register('egob_url')} /></Field>
           <Field label="Estado eGob"><Input placeholder="Ej. Nuevo, Reasignado, Archivado" {...form.register('egob_estado')} /></Field>
@@ -110,8 +108,6 @@ export function ProcessForm({ process, onClose }: { process?: Process; onClose: 
           <Field label="Próxima acción" className="span-2"><Textarea {...form.register('proxima_accion')} /></Field>
           <Field label="Objetivo" className="span-2"><Textarea {...form.register('objetivo')} /></Field>
           <Field label="Observaciones" className="span-2"><Textarea {...form.register('observaciones')} /></Field>
-          <Field label="Confidencialidad"><Select {...form.register('confidencialidad')}><option>Pública</option><option>Interna</option><option>Reservada</option></Select></Field>
-          <label className="check-field"><input type="checkbox" {...form.register('requiere_accion_gerencial')} /><span>Requiere acción gerencial</span></label>
         </div>
         <div className="modal-actions"><Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button><Button type="submit" disabled={form.formState.isSubmitting}>{process ? 'Guardar cambios' : 'Crear trámite'}</Button></div>
       </form>
