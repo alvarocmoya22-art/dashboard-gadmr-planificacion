@@ -46,6 +46,15 @@ function cleanCatalogs(items: CatalogItem[]) {
   return items.map((item) => ({ ...item, nombre: repairMojibake(item.nombre) }))
 }
 
+function cleanLog(item: ChangeLog): ChangeLog {
+  return {
+    ...item,
+    campo: repairMojibake(item.campo),
+    valor_anterior: item.valor_anterior == null ? item.valor_anterior : repairMojibake(item.valor_anterior),
+    valor_nuevo: item.valor_nuevo == null ? item.valor_nuevo : repairMojibake(item.valor_nuevo),
+  }
+}
+
 function hydrate(process: Process, areas: CatalogItem[], types: CatalogItem[], statuses: CatalogItem[], priorities: CatalogItem[]) {
   return deriveProcess({
     ...process,
@@ -104,7 +113,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setProcesses((result.data ?? []).map(deriveProcess))
       const logResult = await supabase.from('process_change_log').select('*').order('created_at', { ascending: false }).limit(80)
       if (!logResult.error) {
-        setLogs((logResult.data ?? []).map((item) => ({ ...item, usuario: 'Sistema' })))
+        setLogs((logResult.data ?? []).map((item) => cleanLog({ ...item, usuario: 'Sistema' })))
       }
       const commentResult = await supabase
         .from('process_comments')
@@ -131,7 +140,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
       client.from('processes').select('*, area:areas(*), tipo:process_types(*), estado:process_statuses(*), prioridad:priorities(*)').eq('activo', true)
         .then(({ data }) => data && setProcesses(data.map(deriveProcess)))
     }).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'process_change_log' }, (payload) => {
-      const log = { ...(payload.new as ChangeLog), usuario: 'Sistema' }
+      const log = cleanLog({ ...(payload.new as ChangeLog), usuario: 'Sistema' })
       setLogs((old) => [log, ...old].slice(0, 80))
       if (log.campo === 'estado_id') toast.info('Un trámite cambió de estado. Revisa la campana de notificaciones.')
     }).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'process_comments' }, (payload) => {
