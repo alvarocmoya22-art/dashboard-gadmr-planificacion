@@ -26,7 +26,9 @@ interface AppState {
   saveProcess: (data: ProcessFormData, current?: Process) => Promise<void>
   deleteProcess: (id: string) => Promise<void>
   addComment: (processId: string, contenido: string) => Promise<void>
+  deleteComment: (id: string) => Promise<void>
   uploadAttachment: (processId: string, file: File) => Promise<void>
+  deleteAttachment: (attachment: ProcessAttachment) => Promise<void>
   openAttachment: (attachment: ProcessAttachment) => Promise<void>
   importProcesses: (rows: ProcessFormData[]) => Promise<number>
   addCatalogItem: (kind: CatalogKind, name: string) => Promise<void>
@@ -162,9 +164,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'process_comments' }, (payload) => {
       const comment = payload.new as ProcessComment
       setComments((old) => [{ ...comment, contenido: repairMojibake(comment.contenido), usuario: 'Usuario institucional' }, ...old].slice(0, 200))
+    }).on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'process_comments' }, (payload) => {
+      const comment = payload.old as ProcessComment
+      setComments((old) => old.filter((item) => item.id !== comment.id))
     }).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'process_attachments' }, (payload) => {
       const attachment = payload.new as ProcessAttachment
       setAttachments((old) => [{ ...attachment, nombre_archivo: repairMojibake(attachment.nombre_archivo), usuario: 'Usuario institucional' }, ...old].slice(0, 300))
+    }).on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'process_attachments' }, (payload) => {
+      const attachment = payload.old as ProcessAttachment
+      setAttachments((old) => old.filter((item) => item.id !== attachment.id))
     }).subscribe()
     return () => { void client.removeChannel(channel) }
   }, [])
@@ -264,6 +272,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     toast.success('Comentario publicado')
   }
 
+  async function deleteComment(id: string) {
+    if (supabase) {
+      const { error } = await supabase.from('process_comments').delete().eq('id', id)
+      if (error) throw error
+    }
+    setComments((old) => old.filter((item) => item.id !== id))
+    toast.success('Comentario eliminado')
+  }
+
   async function uploadAttachment(processId: string, file: File) {
     if (!file) return
     if (!supabase) {
@@ -303,6 +320,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (error) throw error
     if (data) setAttachments((old) => [{ ...data, nombre_archivo: repairMojibake(data.nombre_archivo), usuario: userName }, ...old].slice(0, 300))
     toast.success('Adjunto cargado')
+  }
+
+  async function deleteAttachment(attachment: ProcessAttachment) {
+    if (supabase) {
+      const remove = await supabase.storage.from('process-attachments').remove([attachment.storage_path])
+      if (remove.error) throw remove.error
+      const { error } = await supabase.from('process_attachments').delete().eq('id', attachment.id)
+      if (error) throw error
+    } else if (attachment.storage_path.startsWith('blob:')) {
+      URL.revokeObjectURL(attachment.storage_path)
+    }
+    setAttachments((old) => old.filter((item) => item.id !== attachment.id))
+    toast.success('Adjunto eliminado')
   }
 
   async function openAttachment(attachment: ProcessAttachment) {
@@ -369,7 +399,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const value = useMemo(() => ({
     processes, areas, processTypes, statuses, priorities, logs, comments, attachments, loading,
     demoMode: !isSupabaseConfigured, role, userName, userEmail, userAreaName, canAccessManagement, globalSearch, setGlobalSearch,
-    saveProcess, deleteProcess, addComment, uploadAttachment, openAttachment, importProcesses, addCatalogItem, updateCatalogItem, deleteCatalogItem,
+    saveProcess, deleteProcess, addComment, deleteComment, uploadAttachment, deleteAttachment, openAttachment, importProcesses, addCatalogItem, updateCatalogItem, deleteCatalogItem,
   }), [processes, areas, processTypes, statuses, priorities, logs, comments, attachments, loading, role, userName, userEmail, userAreaName, canAccessManagement, globalSearch])
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
