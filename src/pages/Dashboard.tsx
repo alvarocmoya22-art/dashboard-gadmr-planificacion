@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { AlertTriangle, ArrowRight, BriefcaseBusiness, CalendarClock, CheckCircle2, CircleGauge, ExternalLink, Flag, Layers3, MoveUpRight, Search } from 'lucide-react'
+import { AlertTriangle, ArrowRight, BriefcaseBusiness, CalendarClock, CheckCircle2, CircleGauge, ExternalLink, FileText, Flag, Layers3, MoveUpRight, Paperclip, Search } from 'lucide-react'
 import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Link } from 'react-router-dom'
 import { Card, Badge } from '../components/ui'
@@ -19,13 +19,18 @@ function shortAreaLabel(value: string) {
 }
 
 export function Dashboard() {
-  const { processes, comments } = useApp()
+  const { processes, comments, attachments, openAttachment } = useApp()
   const [portfolioSearch, setPortfolioSearch] = useState('')
 
   const latestCommentByProcess = useMemo(() => comments.reduce<Record<string, string>>((acc, comment) => {
     if (!acc[comment.process_id]) acc[comment.process_id] = repairMojibake(comment.contenido)
     return acc
   }, {}), [comments])
+
+  const latestAttachmentByProcess = useMemo(() => attachments.reduce<Record<string, typeof attachments[number]>>((acc, attachment) => {
+    if (!acc[attachment.process_id]) acc[attachment.process_id] = attachment
+    return acc
+  }, {}), [attachments])
 
   const metrics = useMemo(() => {
     const active = processes.filter((item) => item.estado?.nombre !== 'Finalizado')
@@ -63,6 +68,7 @@ export function Dashboard() {
   const executiveFiltered = executivePortfolio.filter((process) => {
     if (!executiveQuery) return true
     const latestComment = latestCommentByProcess[process.id] ?? ''
+    const latestAttachment = latestAttachmentByProcess[process.id]?.nombre_archivo ?? ''
     const text = [
       process.codigo_proceso,
       process.nombre_proceso,
@@ -74,6 +80,7 @@ export function Dashboard() {
       process.egob_ultimo_movimiento,
       process.proxima_accion,
       latestComment,
+      latestAttachment,
     ].map((value) => normalizeText(repairMojibake(value ?? ''))).join(' ').toLocaleLowerCase('es')
     return text.includes(executiveQuery)
   })
@@ -105,11 +112,13 @@ export function Dashboard() {
         const egobNumber = getEgobIssueNumber(process)
         const egobUrl = getEgobIssueUrl(process)
         const latestComment = latestCommentByProcess[process.id]
+        const latestAttachment = latestAttachmentByProcess[process.id]
         return <article className="critical-row" key={process.id}>
           <span className={`traffic traffic-${process.semaforo?.toLowerCase()}`} />
           <div className="critical-main">
             <small>{process.codigo_proceso} · {process.area?.nombre}</small>
             <strong>{process.nombre_proceso}</strong>
+            <span className="executive-attachment-line"><Paperclip size={12} /> Último adjunto: {latestAttachment ? repairMojibake(latestAttachment.nombre_archivo) : 'Sin adjunto cargado'}</span>
             <span>Actualmente con eGob: {process.egob_responsable_actual || 'Pendiente de sincronizar'}</span>
             <span>Último comentario: {latestComment || 'Sin comentario interno'}</span>
             <span>Último movimiento eGob: {process.egob_ultimo_movimiento || 'Pendiente de sincronizar'}</span>
@@ -119,6 +128,7 @@ export function Dashboard() {
             <div className="egob-actions">
               {egobNumber ? <span className="egob-number">eGob #{egobNumber}</span> : <span className="egob-number muted">Sin eGob</span>}
               {egobUrl ? <a className="egob-open" href={egobUrl} target="_blank" rel="noreferrer"><ExternalLink size={14} /> Abrir eGob</a> : null}
+              {latestAttachment ? <button className="attachment-open" type="button" onClick={() => void openAttachment(latestAttachment)}><FileText size={14} /> Abrir adjunto</button> : null}
             </div>
           </div>
           <Link className="row-detail-link" to={`/procesos/${process.id}`} aria-label={`Ver detalle de ${process.nombre_proceso}`}><ArrowRight size={17} /></Link>
