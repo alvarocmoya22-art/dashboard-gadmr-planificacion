@@ -1,22 +1,12 @@
-import { useMemo, useState } from 'react'
-import { AlertTriangle, ArrowRight, BriefcaseBusiness, CalendarClock, CheckCircle2, CircleGauge, ExternalLink, FileText, Flag, Layers3, MoveUpRight, Paperclip, Search } from 'lucide-react'
-import { Bar, BarChart, CartesianGrid, Cell, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
+﻿import { useMemo, useState } from 'react'
+import { AlertTriangle, ArrowRight, BriefcaseBusiness, CalendarClock, CheckCircle2, CircleGauge, ExternalLink, FileText, Flag, Layers3, Paperclip, Search, ShieldCheck } from 'lucide-react'
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 import { Link } from 'react-router-dom'
 import { Card, Badge } from '../components/ui'
 import { useApp } from '../store/AppContext'
 import { getEgobIssueNumber, getEgobIssueUrl } from '../lib/egob'
 import { formatDate, normalizeText, repairMojibake } from '../lib/utils'
 
-function shortAreaLabel(value: string) {
-  const cleanValue = repairMojibake(value)
-  const labels: Record<string, string> = {
-    'PLANIFICACIÓN, HABITAT Y DESARROLLO': 'PLANIFICACIÓN',
-    'DISEÑO DE LA OBRA PÚBLICA': 'DISEÑO OBRA',
-    'HABILITACIÓN DE SUELO Y EDIFICACIÓN': 'HABILITACIÓN',
-    'DIRECCIÓN DE OBRAS PUBLICAS': 'OBRAS PÚBLICAS',
-  }
-  return labels[cleanValue] ?? (cleanValue.length > 16 ? `${cleanValue.slice(0, 16)}…` : cleanValue)
-}
 
 export function Dashboard() {
   const { processes, comments, attachments, openAttachment } = useApp()
@@ -48,14 +38,6 @@ export function Dashboard() {
     return acc
   }, {})), [processes])
 
-  const areaData = useMemo(() => Object.values(processes.reduce<Record<string, { name: string; procesos: number; avance: number; total: number }>>((acc, item) => {
-    const name = repairMojibake(item.area?.nombre ?? 'Sin área')
-    acc[name] ??= { name, procesos: 0, avance: 0, total: 0 }
-    acc[name].procesos += 1
-    acc[name].total += item.porcentaje_avance
-    acc[name].avance = Math.round(acc[name].total / acc[name].procesos)
-    return acc
-  }, {})).slice(0, 6), [processes])
 
   const executivePortfolio = processes
     .filter((item) => item.estado?.nombre !== 'Finalizado')
@@ -87,27 +69,33 @@ export function Dashboard() {
   const executivePreview = executiveFiltered.slice(0, 6)
 
   const kpis = [
-    { label: 'Trámites activos', value: metrics.active.length, note: `${processes.length} en seguimiento`, icon: BriefcaseBusiness, tone: 'teal' },
+    { label: 'TrÃ¡mites activos', value: metrics.active.length, note: `${processes.length} en seguimiento`, icon: BriefcaseBusiness, tone: 'teal' },
     { label: 'Finalizados', value: metrics.finished.length, note: 'Cumplimiento acumulado', icon: CheckCircle2, tone: 'blue' },
-    { label: 'Vencidos', value: metrics.overdue.length, note: metrics.overdue.length ? 'Requieren intervención' : 'Sin retrasos críticos', icon: AlertTriangle, tone: 'red' },
-    { label: 'Por vencer', value: metrics.expiring.length, note: 'Próximos 7 días', icon: CalendarClock, tone: 'amber' },
+    { label: 'Vencidos', value: metrics.overdue.length, note: metrics.overdue.length ? 'Requieren intervenciÃ³n' : 'Sin retrasos crÃ­ticos', icon: AlertTriangle, tone: 'red' },
+    { label: 'Por vencer', value: metrics.expiring.length, note: 'PrÃ³ximos 7 dÃ­as', icon: CalendarClock, tone: 'amber' },
     { label: 'Avance general', value: `${metrics.average}%`, note: 'Promedio institucional', icon: CircleGauge, tone: 'purple' },
   ]
 
+  const institutionalItems = [
+    { label: 'Portafolio activo', value: metrics.active.length, detail: 'Trámites abiertos para seguimiento' },
+    { label: 'Con decisión pendiente', value: metrics.overdue.length, detail: 'Casos vencidos o en semáforo rojo' },
+    { label: 'Por revisar pronto', value: metrics.expiring.length, detail: 'Alertas próximas de seguimiento' },
+    { label: 'Avance institucional', value: `${metrics.average}%`, detail: 'Promedio general del portafolio' },
+  ]
   return <div className="dashboard-grid">
     <section className="kpi-grid">{kpis.map(({ label, value, note, icon: Icon, tone }) => <Card className={`kpi-card tone-${tone}`} key={label}><div className="kpi-icon"><Icon size={20} /></div><div><span>{label}</span><strong>{value}</strong><small>{note}</small></div></Card>)}</section>
     <section className="attention-banner">
       <div className="attention-icon"><Flag size={22} /></div>
-      <div><p className="eyebrow">Qué requiere atención hoy</p><h2>{metrics.overdue.length || metrics.expiring.length ? `${metrics.overdue.length + metrics.expiring.length} trámites necesitan seguimiento cercano` : 'La operación está bajo control'}</h2><p>Priorizamos vencimientos, alta prioridad y solicitudes explícitas de acción gerencial.</p></div>
+      <div><p className="eyebrow">QuÃ© requiere atenciÃ³n hoy</p><h2>{metrics.overdue.length || metrics.expiring.length ? `${metrics.overdue.length + metrics.expiring.length} trÃ¡mites necesitan seguimiento cercano` : 'La operaciÃ³n estÃ¡ bajo control'}</h2><p>Priorizamos vencimientos, alta prioridad y solicitudes explÃ­citas de acciÃ³n gerencial.</p></div>
       <Link to="/alertas">Revisar alertas <ArrowRight size={17} /></Link>
     </section>
     <section className="chart-grid">
-      <Card className="chart-card"><div className="card-heading"><div><p className="eyebrow">Distribución</p><h3>Trámites por estado</h3></div><Layers3 size={20} /></div><div className="donut-wrap"><ResponsiveContainer width="100%" height={260}><PieChart><Pie data={statusData} dataKey="value" nameKey="name" innerRadius={70} outerRadius={100} paddingAngle={4}>{statusData.map((item) => <Cell key={item.name} fill={item.color} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer><div className="donut-center"><strong>{processes.length}</strong><span>Total</span></div></div><div className="legend">{statusData.map((item) => <span key={item.name}><i style={{ background: item.color }} />{item.name}<b>{item.value}</b></span>)}</div></Card>
-      <Card className="chart-card wide"><div className="card-heading"><div><p className="eyebrow">Desempeño</p><h3>Avance promedio por área</h3></div><MoveUpRight size={20} /></div><ResponsiveContainer width="100%" height={300}><BarChart data={areaData} margin={{ left: 0, right: 10, top: 15, bottom: 10 }}><CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e9e7" /><XAxis dataKey="name" tick={{ fontSize: 9 }} tickFormatter={shortAreaLabel} interval={0} minTickGap={4} axisLine={false} tickLine={false} /><YAxis domain={[0, 100]} tick={{ fontSize: 10 }} axisLine={false} tickLine={false} /><Tooltip formatter={(value) => `${value}%`} /><Bar dataKey="avance" fill="#0f766e" radius={[7, 7, 0, 0]} maxBarSize={48} /></BarChart></ResponsiveContainer></Card>
+      <Card className="chart-card"><div className="card-heading"><div><p className="eyebrow">DistribuciÃ³n</p><h3>TrÃ¡mites por estado</h3></div><Layers3 size={20} /></div><div className="donut-wrap"><ResponsiveContainer width="100%" height={260}><PieChart><Pie data={statusData} dataKey="value" nameKey="name" innerRadius={70} outerRadius={100} paddingAngle={4}>{statusData.map((item) => <Cell key={item.name} fill={item.color} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer><div className="donut-center"><strong>{processes.length}</strong><span>Total</span></div></div><div className="legend">{statusData.map((item) => <span key={item.name}><i style={{ background: item.color }} />{item.name}<b>{item.value}</b></span>)}</div></Card>
+      <Card className="chart-card wide institutional-card"><div className="card-heading"><div><p className="eyebrow">Seguimiento</p><h3>Estado institucional del portafolio</h3></div><ShieldCheck size={20} /></div><div className="institutional-grid">{institutionalItems.map((item) => <article key={item.label}><span>{item.label}</span><strong>{item.value}</strong><small>{item.detail}</small></article>)}</div><div className="institutional-note"><strong>Lectura ejecutiva</strong><p>Este bloque resume el estado general de los trámites sin comparar direcciones ni generar rankings internos.</p></div></Card>
     </section>
     <section className="critical-section">
-      <div className="section-title"><div><p className="eyebrow">Foco ejecutivo</p><h2>Trámites en seguimiento</h2><span>{executivePortfolio.length} trámites activos alimentados desde la vista operativa · se muestran 6 por defecto</span></div><Link to="/procesos">Ver portafolio completo <ArrowRight size={16} /></Link></div>
-      <div className="executive-search"><Search size={16} /><input value={portfolioSearch} onChange={(event) => setPortfolioSearch(event.target.value)} placeholder="Buscar trámite, código, área, responsable o eGob…" /></div>
+      <div className="section-title"><div><p className="eyebrow">Foco ejecutivo</p><h2>TrÃ¡mites en seguimiento</h2><span>{executivePortfolio.length} trÃ¡mites activos alimentados desde la vista operativa Â· se muestran 6 por defecto</span></div><Link to="/procesos">Ver portafolio completo <ArrowRight size={16} /></Link></div>
+      <div className="executive-search"><Search size={16} /><input value={portfolioSearch} onChange={(event) => setPortfolioSearch(event.target.value)} placeholder="Buscar trÃ¡mite, cÃ³digo, Ã¡rea, responsable o eGobâ€¦" /></div>
       <div className="critical-list">{executivePreview.length ? executivePreview.map((process) => {
         const egobNumber = getEgobIssueNumber(process)
         const egobUrl = getEgobIssueUrl(process)
@@ -116,12 +104,12 @@ export function Dashboard() {
         return <article className="critical-row" key={process.id}>
           <span className={`traffic traffic-${process.semaforo?.toLowerCase()}`} />
           <div className="critical-main">
-            <small>{process.codigo_proceso} · {process.area?.nombre}</small>
+            <small>{process.codigo_proceso} Â· {process.area?.nombre}</small>
             <strong>{process.nombre_proceso}</strong>
-            <span className="executive-attachment-line"><Paperclip size={12} /> Último adjunto: {latestAttachment ? repairMojibake(latestAttachment.nombre_archivo) : 'Sin adjunto cargado'}</span>
+            <span className="executive-attachment-line"><Paperclip size={12} /> Ãšltimo adjunto: {latestAttachment ? repairMojibake(latestAttachment.nombre_archivo) : 'Sin adjunto cargado'}</span>
             <span>Actualmente con eGob: {process.egob_responsable_actual || 'Pendiente de sincronizar'}</span>
-            <span>Último comentario: {latestComment || 'Sin comentario interno'}</span>
-            <span>Último movimiento eGob: {process.egob_ultimo_movimiento || 'Pendiente de sincronizar'}</span>
+            <span>Ãšltimo comentario: {latestComment || 'Sin comentario interno'}</span>
+            <span>Ãšltimo movimiento eGob: {process.egob_ultimo_movimiento || 'Pendiente de sincronizar'}</span>
           </div>
           <div className="critical-actions">
             <div className="critical-meta"><Badge color={process.prioridad?.color}>{process.prioridad?.nombre}</Badge><span>{formatDate(process.fecha_fin_programada)}</span></div>
@@ -133,7 +121,9 @@ export function Dashboard() {
           </div>
           <Link className="row-detail-link" to={`/procesos/${process.id}`} aria-label={`Ver detalle de ${process.nombre_proceso}`}><ArrowRight size={17} /></Link>
         </article>
-      }) : <p className="all-clear">No se encontraron trámites con ese criterio.</p>}</div>
+      }) : <p className="all-clear">No se encontraron trÃ¡mites con ese criterio.</p>}</div>
     </section>
   </div>
 }
+
+
