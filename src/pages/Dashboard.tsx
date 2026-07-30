@@ -76,11 +76,14 @@ export function Dashboard() {
     { label: 'Avance general', value: `${metrics.average}%`, note: 'Promedio institucional', icon: CircleGauge, tone: 'purple' },
   ]
 
-  const institutionalItems = [
-    { label: 'Portafolio activo', value: metrics.active.length, detail: 'Trámites abiertos para seguimiento' },
-    { label: 'Con decisión pendiente', value: metrics.overdue.length, detail: 'Casos vencidos o en semáforo rojo' },
-    { label: 'Por revisar pronto', value: metrics.expiring.length, detail: 'Alertas próximas de seguimiento' },
-    { label: 'Avance institucional', value: `${metrics.average}%`, detail: 'Promedio general del portafolio' },
+  const syncedWithEgob = processes.filter((item) => item.egob_ultimo_movimiento && item.egob_ultimo_movimiento !== 'Pendiente de sincronizar')
+  const onTrack = metrics.active.filter((item) => item.semaforo !== 'Rojo' && item.semaforo !== 'Amarillo')
+  const signalTotal = Math.max(metrics.active.length, 1)
+  const followupSignals = [
+    { label: 'Requieren atención', value: metrics.overdue.length, detail: 'Vencidos o con semáforo rojo', color: '#e84d4d', width: `${Math.round((metrics.overdue.length / signalTotal) * 100)}%` },
+    { label: 'Revisión próxima', value: metrics.expiring.length, detail: 'Próximos 7 días', color: '#df8b2d', width: `${Math.round((metrics.expiring.length / signalTotal) * 100)}%` },
+    { label: 'En seguimiento estable', value: onTrack.length, detail: 'Activos sin alerta inmediata', color: '#168378', width: `${Math.round((onTrack.length / signalTotal) * 100)}%` },
+    { label: 'Con movimiento eGob', value: syncedWithEgob.length, detail: 'Ya registran último movimiento detectado', color: '#2f6bed', width: `${Math.round((syncedWithEgob.length / Math.max(processes.length, 1)) * 100)}%` },
   ]
   return <div className="dashboard-grid">
     <section className="kpi-grid">{kpis.map(({ label, value, note, icon: Icon, tone }) => <Card className={`kpi-card tone-${tone}`} key={label}><div className="kpi-icon"><Icon size={20} /></div><div><span>{label}</span><strong>{value}</strong><small>{note}</small></div></Card>)}</section>
@@ -91,7 +94,7 @@ export function Dashboard() {
     </section>
     <section className="chart-grid">
       <Card className="chart-card"><div className="card-heading"><div><p className="eyebrow">Distribución</p><h3>Trámites por estado</h3></div><Layers3 size={20} /></div><div className="donut-wrap"><ResponsiveContainer width="100%" height={260}><PieChart><Pie data={statusData} dataKey="value" nameKey="name" innerRadius={70} outerRadius={100} paddingAngle={4}>{statusData.map((item) => <Cell key={item.name} fill={item.color} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer><div className="donut-center"><strong>{processes.length}</strong><span>Total</span></div></div><div className="legend">{statusData.map((item) => <span key={item.name}><i style={{ background: item.color }} />{item.name}<b>{item.value}</b></span>)}</div></Card>
-      <Card className="chart-card wide institutional-card"><div className="card-heading"><div><p className="eyebrow">Seguimiento</p><h3>Estado institucional del portafolio</h3></div><ShieldCheck size={20} /></div><div className="institutional-grid">{institutionalItems.map((item) => <article key={item.label}><span>{item.label}</span><strong>{item.value}</strong><small>{item.detail}</small></article>)}</div><div className="institutional-note"><strong>Lectura ejecutiva</strong><p>Este bloque resume el estado general de los trámites sin comparar direcciones ni generar rankings internos.</p></div></Card>
+      <Card className="chart-card wide institutional-card"><div className="card-heading"><div><p className="eyebrow">Seguimiento</p><h3>Semáforo institucional de seguimiento</h3></div><ShieldCheck size={20} /></div><div className="signal-list">{followupSignals.map((item) => <article key={item.label} className="signal-row"><div className="signal-copy"><span>{item.label}</span><small>{item.detail}</small></div><strong>{item.value}</strong><div className="signal-track"><i style={{ width: item.width, background: item.color }} /></div></article>)}</div><div className="institutional-note"><strong>Lectura ejecutiva</strong><p>Este bloque muestra el nivel de atención requerido por el portafolio sin comparar direcciones ni generar rankings internos.</p></div></Card>
     </section>
     <section className="critical-section">
       <div className="section-title"><div><p className="eyebrow">Foco ejecutivo</p><h2>Trámites en seguimiento</h2><span>{executivePortfolio.length} trámites activos alimentados desde la vista operativa · se muestran 6 por defecto</span></div><Link to="/procesos">Ver portafolio completo <ArrowRight size={16} /></Link></div>
