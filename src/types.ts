@@ -67,6 +67,18 @@ export interface ProcessComment {
   usuario?: string
 }
 
+export interface ProcessAttachment {
+  id: string
+  process_id: string
+  nombre_archivo: string
+  storage_path: string
+  mime_type?: string
+  tamano_bytes?: number
+  created_by?: string
+  created_at: string
+  usuario?: string
+}
+
 export interface ProcessFormData {
   area_id: string
   tipo_proceso_id: string

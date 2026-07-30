@@ -3,7 +3,7 @@ import { toast } from 'sonner'
 import { areas as demoAreas, demoProcesses, priorities as demoPriorities, processTypes as demoTypes, statuses as demoStatuses } from '../data/tramites'
 import { deriveProcess, repairMojibake, uid } from '../lib/utils'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
-import type { CatalogItem, ChangeLog, Process, ProcessComment, ProcessFormData, Role } from '../types'
+import type { CatalogItem, ChangeLog, Process, ProcessAttachment, ProcessComment, ProcessFormData, Role } from '../types'
 
 interface AppState {
   processes: Process[]
@@ -13,6 +13,7 @@ interface AppState {
   priorities: CatalogItem[]
   logs: ChangeLog[]
   comments: ProcessComment[]
+  attachments: ProcessAttachment[]
   loading: boolean
   demoMode: boolean
   role: Role
@@ -25,6 +26,8 @@ interface AppState {
   saveProcess: (data: ProcessFormData, current?: Process) => Promise<void>
   deleteProcess: (id: string) => Promise<void>
   addComment: (processId: string, contenido: string) => Promise<void>
+  uploadAttachment: (processId: string, file: File) => Promise<void>
+  openAttachment: (attachment: ProcessAttachment) => Promise<void>
   importProcesses: (rows: ProcessFormData[]) => Promise<number>
   addCatalogItem: (kind: CatalogKind, name: string) => Promise<void>
   updateCatalogItem: (kind: CatalogKind, id: string, name: string) => Promise<void>
@@ -73,6 +76,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [priorities, setPriorities] = useState(demoPriorities)
   const [logs, setLogs] = useState<ChangeLog[]>([])
   const [comments, setComments] = useState<ProcessComment[]>([])
+  const [attachments, setAttachments] = useState<ProcessAttachment[]>([])
   const [loading, setLoading] = useState(true)
   const [role, setRole] = useState<Role>('admin')
   const [userName, setUserName] = useState(isSupabaseConfigured ? 'Usuario institucional' : 'Administrador demo')
@@ -127,6 +131,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
           usuario: 'Usuario institucional',
         })))
       }
+      const attachmentResult = await supabase
+        .from('process_attachments')
+        .select('id,process_id,nombre_archivo,storage_path,mime_type,tamano_bytes,created_by,created_at')
+        .order('created_at', { ascending: false })
+        .limit(300)
+      if (!attachmentResult.error) {
+        setAttachments((attachmentResult.data ?? []).map((item) => ({
+          ...item,
+          nombre_archivo: repairMojibake(item.nombre_archivo),
+          usuario: 'Usuario institucional',
+        })))
+      }
       setLoading(false)
     }
     void load()
@@ -146,6 +162,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'process_comments' }, (payload) => {
       const comment = payload.new as ProcessComment
       setComments((old) => [{ ...comment, contenido: repairMojibake(comment.contenido), usuario: 'Usuario institucional' }, ...old].slice(0, 200))
+    }).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'process_attachments' }, (payload) => {
+      const attachment = payload.new as ProcessAttachment
+      setAttachments((old) => [{ ...attachment, nombre_archivo: repairMojibake(attachment.nombre_archivo), usuario: 'Usuario institucional' }, ...old].slice(0, 300))
     }).subscribe()
     return () => { void client.removeChannel(channel) }
   }, [])
@@ -245,6 +264,57 @@ export function AppProvider({ children }: { children: ReactNode }) {
     toast.success('Comentario publicado')
   }
 
+  async function uploadAttachment(processId: string, file: File) {
+    if (!file) return
+    if (!supabase) {
+      const attachment: ProcessAttachment = {
+        id: uid(),
+        process_id: processId,
+        nombre_archivo: repairMojibake(file.name),
+        storage_path: URL.createObjectURL(file),
+        mime_type: file.type,
+        tamano_bytes: file.size,
+        usuario: userName,
+        created_at: new Date().toISOString(),
+      }
+      setAttachments((old) => [attachment, ...old].slice(0, 300))
+      toast.success('Adjunto agregado en modo demo')
+      return
+    }
+    const { data: authData } = await supabase.auth.getUser()
+    const createdBy = authData.user?.id
+    if (!createdBy) throw new Error('Debes iniciar sesión para cargar adjuntos.')
+    const safeName = repairMojibake(file.name).replace(/[^\w.\- áéíóúÁÉÍÓÚñÑ]/g, '_')
+    const storagePath = `${processId}/${Date.now()}-${safeName}`
+    const upload = await supabase.storage.from('process-attachments').upload(storagePath, file, { upsert: false })
+    if (upload.error) throw upload.error
+    const { data, error } = await supabase
+      .from('process_attachments')
+      .insert({
+        process_id: processId,
+        nombre_archivo: repairMojibake(file.name),
+        storage_path: storagePath,
+        mime_type: file.type || null,
+        tamano_bytes: file.size,
+        created_by: createdBy,
+      })
+      .select('id,process_id,nombre_archivo,storage_path,mime_type,tamano_bytes,created_by,created_at')
+      .single()
+    if (error) throw error
+    if (data) setAttachments((old) => [{ ...data, nombre_archivo: repairMojibake(data.nombre_archivo), usuario: userName }, ...old].slice(0, 300))
+    toast.success('Adjunto cargado')
+  }
+
+  async function openAttachment(attachment: ProcessAttachment) {
+    if (!supabase) {
+      window.open(attachment.storage_path, '_blank', 'noopener,noreferrer')
+      return
+    }
+    const { data, error } = await supabase.storage.from('process-attachments').createSignedUrl(attachment.storage_path, 60 * 10)
+    if (error) throw error
+    window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
+  }
+
   async function importProcesses(rows: ProcessFormData[]) {
     for (const row of rows) await saveProcess(row)
     return rows.length
@@ -297,10 +367,10 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const canAccessManagement = role === 'admin' || role === 'gerente' || userAreaName.trim().toLowerCase() === 'gerencia general'
 
   const value = useMemo(() => ({
-    processes, areas, processTypes, statuses, priorities, logs, comments, loading,
+    processes, areas, processTypes, statuses, priorities, logs, comments, attachments, loading,
     demoMode: !isSupabaseConfigured, role, userName, userEmail, userAreaName, canAccessManagement, globalSearch, setGlobalSearch,
-    saveProcess, deleteProcess, addComment, importProcesses, addCatalogItem, updateCatalogItem, deleteCatalogItem,
-  }), [processes, areas, processTypes, statuses, priorities, logs, comments, loading, role, userName, userEmail, userAreaName, canAccessManagement, globalSearch])
+    saveProcess, deleteProcess, addComment, uploadAttachment, openAttachment, importProcesses, addCatalogItem, updateCatalogItem, deleteCatalogItem,
+  }), [processes, areas, processTypes, statuses, priorities, logs, comments, attachments, loading, role, userName, userEmail, userAreaName, canAccessManagement, globalSearch])
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
 }
