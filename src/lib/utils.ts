@@ -42,6 +42,7 @@ export const getCatalogName = (items: CatalogItem[], id: string) => items.find((
 const brokenAccent = '[\\uFFFD\\uFFFC\\u25A0-\\u25FF?]+'
 const brokenAccentLoose = '[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ0-9\\s,.;:()/#-]{1,8}'
 const preserveUpper = (match: string, upper: string, normal: string) => match === match.toLocaleUpperCase('es') ? upper : normal
+const brokenMark = '[\\uFFFD\\uFFFC\\u25A0-\\u25FF?]+'
 
 export function repairMojibake(value: unknown) {
   let text = String(value ?? '')
@@ -160,6 +161,20 @@ export function repairMojibake(value: unknown) {
     .replace(new RegExp(`P${brokenAccentLoose}BLICA`, 'gi'), (match) => preserveUpper(match, 'PÚBLICA', 'Pública'))
     .replace(new RegExp(`P${brokenAccentLoose}BLICAS`, 'gi'), (match) => preserveUpper(match, 'PÚBLICAS', 'Públicas'))
     .replace(new RegExp(`CORP${brokenAccentLoose}REAS`, 'gi'), (match) => preserveUpper(match, 'CORPÓREAS', 'Corpóreas'))
+    .replace(new RegExp(`REVISI${brokenMark}N`, 'gi'), (match) => preserveUpper(match, 'REVISIÓN', 'Revisión'))
+    .replace(new RegExp(`OBSERVACI${brokenMark}N`, 'gi'), (match) => preserveUpper(match, 'OBSERVACIÓN', 'Observación'))
+    .replace(new RegExp(`REASIGNACI${brokenMark}N`, 'gi'), (match) => preserveUpper(match, 'REASIGNACIÓN', 'Reasignación'))
+    .replace(new RegExp(`FEDERACI${brokenMark}N`, 'gi'), (match) => preserveUpper(match, 'FEDERACIÓN', 'Federación'))
+    .replace(new RegExp(`APROBACI${brokenMark}N`, 'gi'), (match) => preserveUpper(match, 'APROBACIÓN', 'Aprobación'))
+    .replace(new RegExp(`PROHIBICI${brokenMark}N`, 'gi'), (match) => preserveUpper(match, 'PROHIBICIÓN', 'Prohibición'))
+    .replace(new RegExp(`RECOPILACI${brokenMark}N`, 'gi'), (match) => preserveUpper(match, 'RECOPILACIÓN', 'Recopilación'))
+    .replace(new RegExp(`SESI${brokenMark}N`, 'gi'), (match) => preserveUpper(match, 'SESIÓN', 'sesión'))
+    .replace(new RegExp(`SUBDIVISI${brokenMark}N`, 'gi'), (match) => preserveUpper(match, 'SUBDIVISIÓN', 'Subdivisión'))
+    .replace(new RegExp(`L${brokenMark}PEZ`, 'gi'), (match) => preserveUpper(match, 'LÓPEZ', 'López'))
+    .replace(new RegExp(`LOP${brokenMark}Z`, 'gi'), (match) => preserveUpper(match, 'LÓPEZ', 'López'))
+    .replace(new RegExp(`GUAN${brokenMark}`, 'gi'), (match) => preserveUpper(match, 'GUAÑO', 'Guaño'))
+    .replace(new RegExp(`TREVIN${brokenMark}`, 'gi'), (match) => preserveUpper(match, 'TREVIÑO', 'Treviño'))
+    .replace(new RegExp(`PATI${brokenMark}O`, 'gi'), (match) => preserveUpper(match, 'PATIÑO', 'Patiño'))
     .replace(/Planificación, HABITAT Y DESARROLLO/g, 'PLANIFICACIÓN, HABITAT Y DESARROLLO')
     .replace(/Habilitación DE SUELO Y Edificación/g, 'HABILITACIÓN DE SUELO Y EDIFICACIÓN')
     .replace(/Dirección DE OBRAS Públicas/g, 'DIRECCIÓN DE OBRAS PÚBLICAS')
