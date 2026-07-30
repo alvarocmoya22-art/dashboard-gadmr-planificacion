@@ -15,7 +15,7 @@ const nav = [
 ]
 
 const titles: Record<string, [string, string]> = {
-  '/': ['Centro gerencial', 'Una lectura clara de lo que avanza, lo que vence y lo que necesita decisión.'],
+  '/': ['Vista ejecutiva del Director', 'Resumen gerencial del portafolio, movimientos eGob, comentarios internos y próximos puntos de seguimiento.'],
   '/procesos': ['Gestión de trámites', 'Consulta, filtra y actualiza la matriz de trámites institucionales.'],
   '/kanban': ['Flujo institucional', 'Los trámites organizados por su estado actual.'],
   '/alertas': ['Atención requerida', 'Prioridades, retrasos y vacíos de gestión para resolver hoy.'],
@@ -42,8 +42,8 @@ export function Layout({ children }: { children: ReactNode }) {
       .slice(0, 6)
       .map((item) => {
         const process = processes.find((processItem) => processItem.id === item.process_id)
-        const oldStatus = statuses.find((status) => status.id === String(item.valor_anterior ?? ''))?.nombre ?? 'Sin estado'
-        const newStatus = statuses.find((status) => status.id === String(item.valor_nuevo ?? ''))?.nombre ?? 'Sin estado'
+        const oldStatus = repairMojibake(statuses.find((status) => status.id === String(item.valor_anterior ?? ''))?.nombre ?? 'Sin estado')
+        const newStatus = repairMojibake(statuses.find((status) => status.id === String(item.valor_nuevo ?? ''))?.nombre ?? 'Sin estado')
         return {
           id: item.id,
           process,
@@ -68,7 +68,7 @@ export function Layout({ children }: { children: ReactNode }) {
       })
 
     const reviewItems = processes
-      .filter((process) => process.estado?.nombre !== 'Finalizado' && Boolean(process.fecha_proxima_revision) && String(process.fecha_proxima_revision) <= todayIso())
+      .filter((process) => repairMojibake(process.estado?.nombre ?? '') !== 'Finalizado' && Boolean(process.fecha_proxima_revision) && String(process.fecha_proxima_revision) <= todayIso())
       .slice(0, 6)
       .map((process) => ({
         id: `review-${process.id}`,
@@ -119,8 +119,8 @@ export function Layout({ children }: { children: ReactNode }) {
               <header><strong>Notificaciones</strong><span>{notifications.length} novedades</span></header>
               {notifications.length ? notifications.map((item) => <button key={item.id} className="notification-row" onClick={() => { setNotificationsOpen(false); if (item.process) navigate(`/procesos/${item.process.id}`) }}>
                 <span>{item.title} · {item.process?.codigo_proceso ?? 'Trámite'}</span>
-                <strong>{item.process?.nombre_proceso ?? 'Trámite actualizado'}</strong>
-                <small>{item.detail}</small>
+                <strong>{repairMojibake(item.process?.nombre_proceso ?? 'Trámite actualizado')}</strong>
+                <small>{repairMojibake(item.detail)}</small>
                 <em>{new Date(item.created_at).toLocaleString('es-EC')}</em>
               </button>) : <p>No hay novedades registradas todavía.</p>}
             </div>}
