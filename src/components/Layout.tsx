@@ -1,17 +1,12 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { Bell, BookOpen, ChartNoAxesCombined, ChevronLeft, FileUp, KanbanSquare, LayoutDashboard, LogOut, Menu, Search, Settings2, TableProperties, X } from 'lucide-react'
+import { Bell, ChartNoAxesCombined, ChevronLeft, LayoutDashboard, LogOut, Menu, Search, Settings2, X } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { cn, formatDate, repairMojibake, todayIso } from '../lib/utils'
 import { supabase } from '../lib/supabase'
 
 const nav = [
   { to: '/', label: 'Vista ejecutiva', icon: LayoutDashboard },
-  { to: '/procesos', label: 'Vista operativa', icon: TableProperties },
-  { to: '/kanban', label: 'Kanban', icon: KanbanSquare },
-  { to: '/alertas', label: 'Alertas', icon: Bell },
-  { to: '/importar', label: 'Importar / exportar', icon: FileUp },
-  { to: '/catalogos', label: 'Catálogos', icon: BookOpen },
 ]
 
 const titles: Record<string, [string, string]> = {
@@ -30,8 +25,8 @@ export function Layout({ children }: { children: ReactNode }) {
   const [seenNotifications, setSeenNotifications] = useState(() => Number(localStorage.getItem('status-notifications-seen') || 0))
   const { pathname } = useLocation()
   const navigate = useNavigate()
-  const { demoMode, userName, role, canAccessManagement, globalSearch, setGlobalSearch, logs, processes, statuses } = useApp()
-  const visibleNav = canAccessManagement ? nav : nav.filter((item) => item.to === '/procesos')
+  const { demoMode, userName, role, globalSearch, setGlobalSearch, logs, processes, statuses } = useApp()
+  const visibleNav = nav
   const [title, description] = titles[pathname] ?? ['Detalle del trámite', 'Trazabilidad completa del trámite institucional.']
   const showGlobalSearch = pathname === '/procesos'
   const signOut = async () => { await supabase?.auth.signOut() }
