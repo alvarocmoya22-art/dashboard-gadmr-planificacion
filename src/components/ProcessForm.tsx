@@ -7,7 +7,7 @@ import { toast } from 'sonner'
 import { Button, Field, Input, Select, Textarea } from './ui'
 import { useApp } from '../store/AppContext'
 import type { Process, ProcessFormData } from '../types'
-import { todayIso } from '../lib/utils'
+import { repairMojibake, todayIso } from '../lib/utils'
 
 const schema = z.object({
   area_id: z.string().min(1, 'Seleccione un área'),
@@ -44,23 +44,23 @@ export function ProcessForm({ process, onClose }: { process?: Process; onClose: 
     resolver: zodResolver(schema),
     defaultValues: {
       area_id: process?.area_id ?? '', tipo_proceso_id: process?.tipo_proceso_id ?? '',
-      nombre_proceso: process?.nombre_proceso ?? '', responsable_principal: process?.responsable_principal ?? '',
-      responsable_secundario: process?.responsable_secundario ?? '', fecha_inicio: process?.fecha_inicio ?? todayIso(),
+      nombre_proceso: repairMojibake(process?.nombre_proceso ?? ''), responsable_principal: repairMojibake(process?.responsable_principal ?? ''),
+      responsable_secundario: repairMojibake(process?.responsable_secundario ?? ''), fecha_inicio: process?.fecha_inicio ?? todayIso(),
       fecha_fin_programada: process?.fecha_fin_programada ?? '', fecha_fin_real: process?.fecha_fin_real ?? '',
       estado_id: process?.estado_id ?? statuses[0]?.id ?? '', prioridad_id: process?.prioridad_id ?? priorities[1]?.id ?? '',
-      porcentaje_avance: process?.porcentaje_avance ?? 0, dependencia_externa: process?.dependencia_externa ?? '',
-      documento_respaldo: process?.documento_respaldo ?? '', proxima_accion: process?.proxima_accion ?? '',
+      porcentaje_avance: process?.porcentaje_avance ?? 0, dependencia_externa: repairMojibake(process?.dependencia_externa ?? ''),
+      documento_respaldo: repairMojibake(process?.documento_respaldo ?? ''), proxima_accion: repairMojibake(process?.proxima_accion ?? ''),
       egob_numero: process?.egob_numero ?? '', egob_url: process?.egob_url ?? '',
-      egob_estado: process?.egob_estado ?? '', egob_responsable_actual: process?.egob_responsable_actual ?? '',
-      egob_ultimo_movimiento: process?.egob_ultimo_movimiento ?? '',
-      objetivo: process?.objetivo ?? '', observaciones: process?.observaciones ?? '',
+      egob_estado: repairMojibake(process?.egob_estado ?? ''), egob_responsable_actual: repairMojibake(process?.egob_responsable_actual ?? ''),
+      egob_ultimo_movimiento: repairMojibake(process?.egob_ultimo_movimiento ?? ''),
+      objetivo: repairMojibake(process?.objetivo ?? ''), observaciones: repairMojibake(process?.observaciones ?? ''),
       fecha_proxima_revision: process?.fecha_proxima_revision ?? '', requiere_accion_gerencial: process?.requiere_accion_gerencial ?? false,
       confidencialidad: process?.confidencialidad ?? 'Interna',
     },
   })
   const progress = form.watch('porcentaje_avance')
   const statusId = form.watch('estado_id')
-  const finalStatus = statuses.find((item) => item.nombre === 'Finalizado')
+  const finalStatus = statuses.find((item) => repairMojibake(item.nombre) === 'Finalizado')
 
   useEffect(() => {
     if (Number(progress) === 100 && finalStatus && statusId !== finalStatus.id) {
@@ -88,8 +88,8 @@ export function ProcessForm({ process, onClose }: { process?: Process; onClose: 
       <div className="modal-header"><div><p className="eyebrow">Registro institucional</p><h2>{process ? 'Editar trámite' : 'Nuevo trámite'}</h2></div><button onClick={onClose}><X /></button></div>
       <form onSubmit={form.handleSubmit(submit, showValidationHelp)}>
         <div className="form-grid">
-          <Field label="Área responsable *" error={form.formState.errors.area_id?.message}><Select {...form.register('area_id')}><option value="">Seleccionar…</option>{areas.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}</Select></Field>
-          <Field label="Tipo de trámite *" error={form.formState.errors.tipo_proceso_id?.message}><Select {...form.register('tipo_proceso_id')}><option value="">Seleccionar…</option>{processTypes.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}</Select></Field>
+          <Field label="Área responsable *" error={form.formState.errors.area_id?.message}><Select {...form.register('area_id')}><option value="">Seleccionar…</option>{areas.map((item) => <option key={item.id} value={item.id}>{repairMojibake(item.nombre)}</option>)}</Select></Field>
+          <Field label="Tipo de trámite *" error={form.formState.errors.tipo_proceso_id?.message}><Select {...form.register('tipo_proceso_id')}><option value="">Seleccionar…</option>{processTypes.map((item) => <option key={item.id} value={item.id}>{repairMojibake(item.nombre)}</option>)}</Select></Field>
           <Field label="Nombre del trámite *" className="span-2" error={form.formState.errors.nombre_proceso?.message}><Input {...form.register('nombre_proceso')} /></Field>
           <Field label="Responsable principal *" error={form.formState.errors.responsable_principal?.message}><Input {...form.register('responsable_principal')} /></Field>
           <Field label="Responsable secundario"><Input {...form.register('responsable_secundario')} /></Field>
@@ -97,8 +97,8 @@ export function ProcessForm({ process, onClose }: { process?: Process; onClose: 
           <Field label="Fecha fin programada *" error={form.formState.errors.fecha_fin_programada?.message}><Input type="date" {...form.register('fecha_fin_programada')} /></Field>
           <Field label="Fecha fin real"><Input type="date" {...form.register('fecha_fin_real')} /></Field>
           <Field label="Próxima revisión"><Input type="date" {...form.register('fecha_proxima_revision')} /></Field>
-          <Field label="Estado" error={form.formState.errors.estado_id?.message}><Select {...form.register('estado_id')}><option value="">Seleccionar…</option>{statuses.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}</Select></Field>
-          <Field label="Prioridad" error={form.formState.errors.prioridad_id?.message}><Select {...form.register('prioridad_id')}><option value="">Seleccionar…</option>{priorities.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}</Select></Field>
+          <Field label="Estado" error={form.formState.errors.estado_id?.message}><Select {...form.register('estado_id')}><option value="">Seleccionar…</option>{statuses.map((item) => <option key={item.id} value={item.id}>{repairMojibake(item.nombre)}</option>)}</Select></Field>
+          <Field label="Prioridad" error={form.formState.errors.prioridad_id?.message}><Select {...form.register('prioridad_id')}><option value="">Seleccionar…</option>{priorities.map((item) => <option key={item.id} value={item.id}>{repairMojibake(item.nombre)}</option>)}</Select></Field>
           <Field label={`Avance · ${progress}%`} className="span-2" error={form.formState.errors.porcentaje_avance?.message}><Input type="range" min="0" max="100" {...form.register('porcentaje_avance', { valueAsNumber: true })} /></Field>
           <Field label="Nro. trámite eGob / eDoc"><Input placeholder="Ej. 970395" {...form.register('egob_numero')} /></Field>
           <Field label="URL eGob / eDoc"><Input placeholder="https://egobedoc.gadmriobamba.gob.ec:8081/issues/970395" {...form.register('egob_url')} /></Field>

@@ -23,8 +23,8 @@ export function Dashboard() {
   }, {}), [attachments])
 
   const metrics = useMemo(() => {
-    const active = processes.filter((item) => item.estado?.nombre !== 'Finalizado')
-    const finished = processes.filter((item) => item.estado?.nombre === 'Finalizado')
+    const active = processes.filter((item) => repairMojibake(item.estado?.nombre) !== 'Finalizado')
+    const finished = processes.filter((item) => repairMojibake(item.estado?.nombre) === 'Finalizado')
     const overdue = processes.filter((item) => item.semaforo === 'Rojo')
     const expiring = processes.filter((item) => item.semaforo === 'Amarillo')
     const average = processes.length ? Math.round(processes.reduce((sum, item) => sum + item.porcentaje_avance, 0) / processes.length) : 0
@@ -40,9 +40,9 @@ export function Dashboard() {
 
 
   const executivePortfolio = processes
-    .filter((item) => item.estado?.nombre !== 'Finalizado')
+    .filter((item) => repairMojibake(item.estado?.nombre) !== 'Finalizado')
     .sort((a, b) => {
-      const priorityScore = (item: typeof a) => item.semaforo === 'Rojo' ? 0 : item.prioridad?.nombre === 'Alta' ? 1 : item.semaforo === 'Amarillo' ? 2 : 3
+      const priorityScore = (item: typeof a) => item.semaforo === 'Rojo' ? 0 : repairMojibake(item.prioridad?.nombre) === 'Alta' ? 1 : item.semaforo === 'Amarillo' ? 2 : 3
       return priorityScore(a) - priorityScore(b) || String(a.fecha_fin_programada ?? '').localeCompare(String(b.fecha_fin_programada ?? ''))
     })
 
@@ -93,7 +93,7 @@ export function Dashboard() {
     { label: 'Con movimiento eGob', value: syncedWithEgob.length, detail: 'Ya registran último movimiento detectado', color: '#2f6bed', width: `${Math.round((syncedWithEgob.length / Math.max(processes.length, 1)) * 100)}%` },
   ]
   return <div className="dashboard-grid">
-    <section className="kpi-grid">{kpis.map(({ label, value, note, icon: Icon, tone }) => <Card className={`kpi-card tone-${tone}`} key={label}><div className="kpi-icon"><Icon size={20} /></div><div><span>{label}</span><strong>{value}</strong><small>{note}</small></div></Card>)}</section>
+    <section className="kpi-grid">{kpis.map(({ label, value, note, icon: Icon, tone }) => <Card className={`kpi-card tone-${tone}`} key={label}><div className="kpi-icon"><Icon size={20} /></div><div><span>{repairMojibake(label)}</span><strong>{value}</strong><small>{repairMojibake(note)}</small></div></Card>)}</section>
     <section className="attention-banner">
       <div className="attention-icon"><Flag size={22} /></div>
       <div><p className="eyebrow">Qué requiere atención hoy</p><h2>{metrics.overdue.length || metrics.expiring.length ? `${metrics.overdue.length + metrics.expiring.length} trámites necesitan seguimiento cercano` : 'La operación está bajo control'}</h2><p>Priorizamos vencimientos, alta prioridad y solicitudes explícitas de acción gerencial.</p></div>
@@ -101,13 +101,13 @@ export function Dashboard() {
     </section>
     <section className="director-summary-grid">
       {directorSignals.map((item) => <article className="director-summary-card" key={item.label}>
-        <span>{item.label}</span>
+        <span>{repairMojibake(item.label)}</span>
         <strong>{item.value}</strong>
-        <small>{item.detail}</small>
+        <small>{repairMojibake(item.detail)}</small>
       </article>)}
     </section>
     <section className="chart-grid">
-      <Card className="chart-card"><div className="card-heading"><div><p className="eyebrow">Distribución</p><h3>Trámites por estado</h3></div><Layers3 size={20} /></div><div className="donut-wrap"><ResponsiveContainer width="100%" height={260}><PieChart><Pie data={statusData} dataKey="value" nameKey="name" innerRadius={70} outerRadius={100} paddingAngle={4}>{statusData.map((item) => <Cell key={item.name} fill={item.color} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer><div className="donut-center"><strong>{processes.length}</strong><span>Total</span></div></div><div className="legend">{statusData.map((item) => <span key={item.name}><i style={{ background: item.color }} />{item.name}<b>{item.value}</b></span>)}</div></Card>
+      <Card className="chart-card"><div className="card-heading"><div><p className="eyebrow">Distribución</p><h3>Trámites por estado</h3></div><Layers3 size={20} /></div><div className="donut-wrap"><ResponsiveContainer width="100%" height={260}><PieChart><Pie data={statusData} dataKey="value" nameKey="name" innerRadius={70} outerRadius={100} paddingAngle={4}>{statusData.map((item) => <Cell key={item.name} fill={item.color} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer><div className="donut-center"><strong>{processes.length}</strong><span>Total</span></div></div><div className="legend">{statusData.map((item) => <span key={item.name}><i style={{ background: item.color }} />{repairMojibake(item.name)}<b>{item.value}</b></span>)}</div></Card>
       <Card className="chart-card wide institutional-card"><div className="card-heading"><div><p className="eyebrow">Seguimiento</p><h3>Semáforo institucional de seguimiento</h3></div><ShieldCheck size={20} /></div><div className="signal-list">{followupSignals.map((item) => <article key={item.label} className="signal-row"><div className="signal-copy"><span>{item.label}</span><small>{item.detail}</small></div><strong>{item.value}</strong><div className="signal-track"><i style={{ width: item.width, background: item.color }} /></div></article>)}</div><div className="institutional-note"><strong>Lectura ejecutiva</strong><p>Este bloque muestra el nivel de atención requerido por el portafolio sin comparar direcciones ni generar rankings internos.</p></div></Card>
     </section>
     <section className="critical-section">
@@ -135,7 +135,7 @@ export function Dashboard() {
             <span className="executive-info-line line-movement"><b>Último movimiento eGob</b><em>{movementText}</em></span>
           </div>
           <div className="critical-actions">
-            <div className="critical-meta"><Badge color={process.prioridad?.color}>{process.prioridad?.nombre}</Badge><span>{formatDate(process.fecha_fin_programada)}</span></div>
+            <div className="critical-meta"><Badge color={process.prioridad?.color}>{repairMojibake(process.prioridad?.nombre)}</Badge><span>{formatDate(process.fecha_fin_programada)}</span></div>
             <div className="egob-actions">
               {egobNumber ? <span className="egob-number">eGob #{egobNumber}</span> : <span className="egob-number muted">Sin eGob</span>}
               {egobUrl ? <a className="egob-open" href={egobUrl} target="_blank" rel="noreferrer"><ExternalLink size={14} /> Abrir eGob</a> : null}

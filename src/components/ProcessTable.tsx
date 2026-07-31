@@ -4,7 +4,7 @@ import { ArrowUpDown, ExternalLink, MoreHorizontal, Pencil, Search, Trash2 } fro
 import { useNavigate } from 'react-router-dom'
 import type { Process } from '../types'
 import { Badge, Button, Input, Select } from './ui'
-import { formatDate, normalizeText } from '../lib/utils'
+import { formatDate, normalizeText, repairMojibake } from '../lib/utils'
 import { useApp } from '../store/AppContext'
 import { canEditProcesses } from '../lib/permissions'
 import { getEgobIssueNumber, getEgobIssueUrl } from '../lib/egob'
@@ -14,7 +14,7 @@ const helper = createColumnHelper<Process>()
 type ProcessTableFilter = 'active' | 'review'
 
 function isFinalized(process: Process) {
-  return process.estado?.nombre === 'Finalizado'
+  return repairMojibake(process.estado?.nombre) === 'Finalizado'
 }
 
 function isDueForReview(process: Process) {
@@ -40,28 +40,28 @@ export function ProcessTable({ onEdit, view = 'active' }: { onEdit: (process: Pr
       if (!query) return true
       const text = [
         process.codigo_proceso,
-        process.nombre_proceso,
-        process.responsable_principal,
-        process.responsable_secundario,
-        process.area?.nombre,
-        process.estado?.nombre,
-        process.prioridad?.nombre,
-        process.documento_respaldo,
+        repairMojibake(process.nombre_proceso),
+        repairMojibake(process.responsable_principal),
+        repairMojibake(process.responsable_secundario),
+        repairMojibake(process.area?.nombre),
+        repairMojibake(process.estado?.nombre),
+        repairMojibake(process.prioridad?.nombre),
+        repairMojibake(process.documento_respaldo),
         process.egob_numero,
-        process.egob_responsable_actual,
-        process.proxima_accion,
-        process.objetivo,
-        process.observaciones,
+        repairMojibake(process.egob_responsable_actual),
+        repairMojibake(process.proxima_accion),
+        repairMojibake(process.objetivo),
+        repairMojibake(process.observaciones),
       ].map(normalizeText).join(' ').toLocaleLowerCase('es')
       return text.includes(query)
     })
   }, [processes, status, area, search, view])
   const columns = useMemo(() => [
     helper.accessor('codigo_proceso', { header: 'Código', cell: ({ row, getValue }) => <button className="code-link" onClick={() => navigate(`/procesos/${row.original.id}`)}>{getValue()}</button> }),
-    helper.accessor('nombre_proceso', { header: 'Trámite', cell: ({ row, getValue }) => <div className="process-cell"><strong>{getValue()}</strong><span>{row.original.responsable_principal}</span></div> }),
-    helper.accessor((row) => row.area?.nombre ?? '', { id: 'area', header: 'Área', cell: (info) => <span className="muted-cell">{info.getValue()}</span> }),
-    helper.accessor((row) => row.estado?.nombre ?? '', { id: 'estado', header: 'Estado', cell: ({ row, getValue }) => <Badge color={row.original.estado?.color}>{getValue()}</Badge> }),
-    helper.accessor((row) => row.prioridad?.nombre ?? '', { id: 'prioridad', header: 'Prioridad', cell: ({ row, getValue }) => <Badge color={row.original.prioridad?.color}>{getValue()}</Badge> }),
+    helper.accessor('nombre_proceso', { header: 'Trámite', cell: ({ row, getValue }) => <div className="process-cell"><strong>{repairMojibake(getValue())}</strong><span>{repairMojibake(row.original.responsable_principal)}</span></div> }),
+    helper.accessor((row) => row.area?.nombre ?? '', { id: 'area', header: 'Área', cell: (info) => <span className="muted-cell">{repairMojibake(info.getValue())}</span> }),
+    helper.accessor((row) => row.estado?.nombre ?? '', { id: 'estado', header: 'Estado', cell: ({ row, getValue }) => <Badge color={row.original.estado?.color}>{repairMojibake(getValue())}</Badge> }),
+    helper.accessor((row) => row.prioridad?.nombre ?? '', { id: 'prioridad', header: 'Prioridad', cell: ({ row, getValue }) => <Badge color={row.original.prioridad?.color}>{repairMojibake(getValue())}</Badge> }),
     helper.accessor('porcentaje_avance', { header: 'Avance', cell: (info) => <div className="progress-cell"><div><i style={{ width: `${info.getValue()}%` }} /></div><span>{info.getValue()}%</span></div> }),
     helper.accessor('fecha_fin_programada', { header: 'Vencimiento', cell: ({ row, getValue }) => <div className="date-cell"><span className={`traffic traffic-${row.original.semaforo?.toLowerCase()}`} />{formatDate(getValue())}</div> }),
     helper.display({ id: 'egob', header: 'eGob', cell: ({ row }) => {
@@ -80,8 +80,8 @@ export function ProcessTable({ onEdit, view = 'active' }: { onEdit: (process: Pr
   return <div className="table-card">
     <div className="table-toolbar">
       <div className="table-search"><Search size={17} /><Input value={search} onChange={(event) => setGlobalSearch(event.target.value)} placeholder="Buscar en trámites…" /></div>
-      <Select value={area} onChange={(event) => setArea(event.target.value)}><option value="">Todas las áreas</option>{areas.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}</Select>
-      <Select value={status} onChange={(event) => setStatus(event.target.value)}><option value="">Todos los estados</option>{statuses.map((item) => <option key={item.id} value={item.id}>{item.nombre}</option>)}</Select>
+      <Select value={area} onChange={(event) => setArea(event.target.value)}><option value="">Todas las áreas</option>{areas.map((item) => <option key={item.id} value={item.id}>{repairMojibake(item.nombre)}</option>)}</Select>
+      <Select value={status} onChange={(event) => setStatus(event.target.value)}><option value="">Todos los estados</option>{statuses.map((item) => <option key={item.id} value={item.id}>{repairMojibake(item.nombre)}</option>)}</Select>
       <Button variant="ghost" onClick={() => { setGlobalSearch(''); setArea(''); setStatus('') }}>Limpiar</Button>
     </div>
     <div className="table-scroll"><table><thead>{table.getHeaderGroups().map((group) => <tr key={group.id}>{group.headers.map((header) => <th key={header.id} onClick={header.column.getToggleSortingHandler()}>{flexRender(header.column.columnDef.header, header.getContext())}{header.column.getCanSort() && <ArrowUpDown size={13} />}</th>)}</tr>)}</thead>

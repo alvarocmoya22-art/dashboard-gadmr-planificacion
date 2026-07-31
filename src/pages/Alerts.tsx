@@ -6,7 +6,7 @@ import { formatDate, repairMojibake, todayIso } from '../lib/utils'
 import type { Process } from '../types'
 
 function isFinalized(item: Process) {
-  return item.estado?.nombre === 'Finalizado'
+  return repairMojibake(item.estado?.nombre) === 'Finalizado'
 }
 
 function needsReviewToday(item: Process) {
@@ -31,5 +31,5 @@ export function Alerts() {
     { title: 'Sin responsable', description: 'Procesos que necesitan una persona o unidad a cargo.', icon: CircleUserRound, tone: 'blue', items: activeProcesses.filter((item) => !item.responsable_principal), meta: () => 'sin responsable principal' },
   ]
 
-  return <div className="alert-layout">{groups.map(({ title, description, icon: Icon, tone, items, meta }) => <Card className="alert-group" key={title}><header><div className={`alert-icon tone-${tone}`}><Icon size={20} /></div><div><h2>{title}</h2><p>{description}</p></div><strong>{items.length}</strong></header><div>{items.length ? items.map((item) => <Link to={`/procesos/${item.id}`} className="alert-row-link" key={`${title}-${item.id}`}><AlertCircle size={16} /><div><strong>{item.nombre_proceso}</strong><span>{item.codigo_proceso} · {meta(item)}</span></div><Badge color={item.prioridad?.color}>{item.prioridad?.nombre}</Badge></Link>) : <p className="all-clear">Sin novedades en esta categoría.</p>}</div></Card>)}</div>
+  return <div className="alert-layout">{groups.map(({ title, description, icon: Icon, tone, items, meta }) => <Card className="alert-group" key={title}><header><div className={`alert-icon tone-${tone}`}><Icon size={20} /></div><div><h2>{repairMojibake(title)}</h2><p>{repairMojibake(description)}</p></div><strong>{items.length}</strong></header><div>{items.length ? items.map((item) => <Link to={`/procesos/${item.id}`} className="alert-row-link" key={`${title}-${item.id}`}><AlertCircle size={16} /><div><strong>{repairMojibake(item.nombre_proceso)}</strong><span>{item.codigo_proceso} · {repairMojibake(meta(item))}</span></div><Badge color={item.prioridad?.color}>{repairMojibake(item.prioridad?.nombre)}</Badge></Link>) : <p className="all-clear">Sin novedades en esta categoría.</p>}</div></Card>)}</div>
 }
