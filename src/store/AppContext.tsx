@@ -336,13 +336,28 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }
 
   async function openAttachment(attachment: ProcessAttachment) {
+    const pendingWindow = window.open('', '_blank')
+    if (pendingWindow) pendingWindow.opener = null
+    const openUrl = (url: string) => {
+      if (pendingWindow) {
+        pendingWindow.location.href = url
+      } else {
+        window.location.assign(url)
+      }
+    }
+
     if (!supabase) {
-      window.open(attachment.storage_path, '_blank', 'noopener,noreferrer')
+      openUrl(attachment.storage_path)
       return
     }
-    const { data, error } = await supabase.storage.from('process-attachments').createSignedUrl(attachment.storage_path, 60 * 10)
-    if (error) throw error
-    window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
+    try {
+      const { data, error } = await supabase.storage.from('process-attachments').createSignedUrl(attachment.storage_path, 60 * 10)
+      if (error) throw error
+      openUrl(data.signedUrl)
+    } catch (error) {
+      pendingWindow?.close()
+      throw error
+    }
   }
 
   async function importProcesses(rows: ProcessFormData[]) {

@@ -10,6 +10,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
   const [checking, setChecking] = useState(isSupabaseConfigured)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const logoUrl = `${import.meta.env.BASE_URL}gadmr-logo.png`
 
   useEffect(() => {
     if (!supabase) return
@@ -30,7 +31,7 @@ export function AuthGate({ children }: { children: ReactNode }) {
 
   return <div className="auth-screen">
     <div className="auth-brand">
-      <img className="auth-logo" src="/gadmr-logo.png" alt="GADMR Riobamba" />
+      <img className="auth-logo" src={logoUrl} alt="GADMR Riobamba" />
       <p>Dirección General de Gestión de Planificación, Hábitat y Desarrollo Urbanístico</p>
       <h1>Seguimiento de trámites<br />con información clara.</h1>
       <span>GADMR de Riobamba</span>

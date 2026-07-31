@@ -29,6 +29,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const visibleNav = nav
   const [title, description] = titles[pathname] ?? ['Detalle del trámite', 'Trazabilidad completa del trámite institucional.']
   const showGlobalSearch = pathname === '/procesos'
+  const logoUrl = `${import.meta.env.BASE_URL}gadmr-logo.png`
   const signOut = async () => { await supabase?.auth.signOut() }
 
   const notifications = useMemo(() => {
@@ -88,7 +89,7 @@ export function Layout({ children }: { children: ReactNode }) {
   return <div className="app-shell">
     <aside className={cn('sidebar', collapsed && 'sidebar-collapsed', open && 'sidebar-open')}>
       <div className="brand">
-        <div className="brand-mark"><img src="/gadmr-logo.png" alt="GADMR Riobamba" /></div>
+        <div className="brand-mark"><img src={logoUrl} alt="GADMR Riobamba" /></div>
         {!collapsed && <div className="brand-copy"><strong>GADMR Riobamba</strong><small>Planificación, Hábitat y Desarrollo Urbanístico</small></div>}
         <button className="mobile-close" onClick={() => setOpen(false)}><X size={20} /></button>
       </div>

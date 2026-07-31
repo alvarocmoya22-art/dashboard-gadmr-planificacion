@@ -305,3 +305,45 @@ main { padding:30px 34px 48px;max-width:1600px;margin:auto; }
     background:#f2f7f5;
   }
 }
+
+@media (max-width:600px) {
+  .notification-wrap { position:static; }
+  .notification-panel {
+    position:fixed;
+    left:12px;
+    right:12px;
+    top:86px;
+    width:auto;
+    max-width:none;
+    max-height:min(68vh,560px);
+    border-radius:18px;
+    overflow-y:auto;
+    -webkit-overflow-scrolling:touch;
+    overscroll-behavior:contain;
+  }
+  .notification-panel header {
+    position:sticky;
+    top:0;
+    z-index:1;
+    background:#fff;
+  }
+  .notification-row { padding:13px 14px; }
+  .notification-row span {
+    white-space:normal;
+    font-size:9px;
+    line-height:1.35;
+  }
+  .notification-row strong {
+    white-space:normal;
+    overflow:visible;
+    text-overflow:clip;
+    font-size:12px;
+    line-height:1.35;
+  }
+  .notification-row small {
+    font-size:11px;
+    line-height:1.45;
+    overflow-wrap:anywhere;
+  }
+  .notification-row em { font-size:10px; }
+}
