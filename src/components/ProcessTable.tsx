@@ -12,6 +12,11 @@ import { getEgobIssueNumber, getEgobIssueUrl } from '../lib/egob'
 const helper = createColumnHelper<Process>()
 
 type ProcessTableFilter = 'active' | 'review'
+type ProcessTableProps = {
+  onEdit: (process: Process) => void
+  view?: ProcessTableFilter
+  processesOverride?: Process[]
+}
 
 function isFinalized(process: Process) {
   return repairMojibake(process.estado?.nombre) === 'Finalizado'
@@ -23,8 +28,9 @@ function isDueForReview(process: Process) {
   return process.fecha_proxima_revision <= today
 }
 
-export function ProcessTable({ onEdit, view = 'active' }: { onEdit: (process: Process) => void; view?: ProcessTableFilter }) {
+export function ProcessTable({ onEdit, view = 'active', processesOverride }: ProcessTableProps) {
   const { processes, deleteProcess, statuses, areas, role, userEmail, globalSearch, setGlobalSearch } = useApp()
+  const sourceProcesses = processesOverride ?? processes
   const [sorting, setSorting] = useState<SortingState>([])
   const [status, setStatus] = useState('')
   const [area, setArea] = useState('')
@@ -32,7 +38,7 @@ export function ProcessTable({ onEdit, view = 'active' }: { onEdit: (process: Pr
   const search = globalSearch
   const filtered = useMemo(() => {
     const query = normalizeText(search).toLocaleLowerCase('es')
-    return processes.filter((process) => {
+    return sourceProcesses.filter((process) => {
       if (isFinalized(process)) return false
       if (view === 'review' && !isDueForReview(process)) return false
       const matchesFilters = (!status || process.estado_id === status) && (!area || process.area_id === area)
@@ -55,7 +61,7 @@ export function ProcessTable({ onEdit, view = 'active' }: { onEdit: (process: Pr
       ].map(normalizeText).join(' ').toLocaleLowerCase('es')
       return text.includes(query)
     })
-  }, [processes, status, area, search, view])
+  }, [sourceProcesses, status, area, search, view])
   const columns = useMemo(() => [
     helper.accessor('codigo_proceso', { header: 'Código', cell: ({ row, getValue }) => <button className="code-link" onClick={() => navigate(`/procesos/${row.original.id}`)}>{getValue()}</button> }),
     helper.accessor('nombre_proceso', { header: 'Trámite', cell: ({ row, getValue }) => <div className="process-cell"><strong>{repairMojibake(getValue())}</strong><span>{repairMojibake(row.original.responsable_principal)}</span></div> }),

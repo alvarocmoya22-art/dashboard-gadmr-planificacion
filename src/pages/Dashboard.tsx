@@ -77,12 +77,8 @@ export function Dashboard() {
   ]
 
   const syncedWithEgob = processes.filter((item) => item.egob_ultimo_movimiento && item.egob_ultimo_movimiento !== 'Pendiente de sincronizar')
-  const withEgobOwner = processes.filter((item) => item.egob_responsable_actual && item.egob_responsable_actual !== 'Pendiente de sincronizar')
   const directorSignals = [
-    { label: 'Ubicación eGob identificada', value: withEgobOwner.length, detail: 'Trámites con responsable actual detectado' },
-    { label: 'Movimientos eGob detectados', value: syncedWithEgob.length, detail: 'Último movimiento disponible para seguimiento' },
-    { label: 'Comentarios internos', value: comments.length, detail: 'Notas cargadas por el equipo para decisión' },
-    { label: 'Adjuntos internos', value: attachments.length, detail: 'Respaldos disponibles dentro del dashboard' },
+    { label: 'Comentarios internos', value: comments.length, detail: 'Ver trámites con notas cargadas por el equipo', to: '/procesos?comentarios=1' },
   ]
   const onTrack = metrics.active.filter((item) => item.semaforo !== 'Rojo' && item.semaforo !== 'Amarillo')
   const signalTotal = Math.max(metrics.active.length, 1)
@@ -99,15 +95,15 @@ export function Dashboard() {
       <div><p className="eyebrow">Qué requiere atención hoy</p><h2>{metrics.overdue.length || metrics.expiring.length ? `${metrics.overdue.length + metrics.expiring.length} trámites necesitan seguimiento cercano` : 'La operación está bajo control'}</h2><p>Priorizamos vencimientos, alta prioridad y solicitudes explícitas de acción gerencial.</p></div>
       <Link to="/alertas">Revisar alertas <ArrowRight size={17} /></Link>
     </section>
-    <section className="director-summary-grid">
-      {directorSignals.map((item) => <article className="director-summary-card" key={item.label}>
+    <section className="director-summary-grid director-summary-grid-compact">
+      {directorSignals.map((item) => <Link className="director-summary-card director-summary-card-link" key={item.label} to={item.to}>
         <span>{repairMojibake(item.label)}</span>
         <strong>{item.value}</strong>
         <small>{repairMojibake(item.detail)}</small>
-      </article>)}
+      </Link>)}
     </section>
     <section className="chart-grid">
-      <Card className="chart-card"><div className="card-heading"><div><p className="eyebrow">Distribución</p><h3>Trámites por estado</h3></div><Layers3 size={20} /></div><div className="donut-wrap"><ResponsiveContainer width="100%" height={260}><PieChart><Pie data={statusData} dataKey="value" nameKey="name" innerRadius={70} outerRadius={100} paddingAngle={4}>{statusData.map((item) => <Cell key={item.name} fill={item.color} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer><div className="donut-center"><strong>{processes.length}</strong><span>Total</span></div></div><div className="legend">{statusData.map((item) => <span key={item.name}><i style={{ background: item.color }} />{repairMojibake(item.name)}<b>{item.value}</b></span>)}</div></Card>
+      <Card className="chart-card status-chart-card"><div className="card-heading"><div><p className="eyebrow">Distribución</p><h3>Trámites por estado</h3></div><Layers3 size={20} /></div><div className="donut-wrap"><ResponsiveContainer width="100%" height={260}><PieChart><Pie data={statusData} dataKey="value" nameKey="name" innerRadius={70} outerRadius={100} paddingAngle={4}>{statusData.map((item) => <Cell key={item.name} fill={item.color} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer><div className="donut-center"><strong>{processes.length}</strong><span>Total</span></div></div><div className="legend status-legend">{statusData.map((item) => <span key={item.name}><i style={{ background: item.color }} /><em>{repairMojibake(item.name)}</em><b>{item.value}</b></span>)}</div></Card>
       <Card className="chart-card wide institutional-card"><div className="card-heading"><div><p className="eyebrow">Seguimiento</p><h3>Semáforo institucional de seguimiento</h3></div><ShieldCheck size={20} /></div><div className="signal-list">{followupSignals.map((item) => <article key={item.label} className="signal-row"><div className="signal-copy"><span>{item.label}</span><small>{item.detail}</small></div><strong>{item.value}</strong><div className="signal-track"><i style={{ width: item.width, background: item.color }} /></div></article>)}</div><div className="institutional-note"><strong>Lectura ejecutiva</strong><p>Este bloque muestra el nivel de atención requerido por el portafolio sin comparar direcciones ni generar rankings internos.</p></div></Card>
     </section>
     <section className="critical-section">
