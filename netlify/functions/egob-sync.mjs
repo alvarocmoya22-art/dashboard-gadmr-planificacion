@@ -19,6 +19,7 @@ function knownIssueData(issue) {
       estado: 'Nuevo',
       prioridad: '',
       responsable_actual: 'JUAN DIEGO REMACHE RIVERA',
+      responsable_cargo: 'DIRECTOR GENERAL DE GESTIÓN DE PLANIFICACIÓN, HÁBITAT Y DESARROLLO URBANÍSTICO',
       ultimo_movimiento: 'Trámite 1217995: 2026-07-29 12:13 - Documento enviado a JUAN DIEGO REMACHE RIVERA',
       actualizado_en: '2026-07-29 12:13',
       tramites_hijos: ['1181024', '1217995'],
@@ -181,6 +182,18 @@ function stripText(html) {
     .replace(/\n\s+/g, '\n')
     .replace(/\n{2,}/g, '\n')
     .trim()
+}
+
+function escapeRegExp(value = '') {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function parseRoleForAssignee(text, assignee) {
+  if (!assignee) return ''
+  const repairedText = repairMojibake(text)
+  const namePattern = escapeRegExp(repairMojibake(assignee)).replace(/\s+/g, '\\s+')
+  const match = repairedText.match(new RegExp(`${namePattern}\\s*\\(([^)\\n]{4,})\\)`, 'i'))
+  return repairMojibake(match?.[1] || '').replace(/\s+/g, ' ').trim()
 }
 
 function matchBetween(text, start, end) {
@@ -356,6 +369,7 @@ function parseIssue(issue, html, finalUrl) {
   const latestMovement = [latestReassignment, latestDocumentSent, latestFlow]
     .filter(Boolean)
     .reduce((best, item) => (movementTime(item) >= movementTime(best) ? item : best), latestReassignment || latestDocumentSent || latestFlow || null)
+  const resolvedOwner = latestMovement?.responsable_actual || responsableActual
   const children = [...html.matchAll(/href=["']\/issues\/(\d+)["']/g)].map((item) => item[1]).filter((value, index, array) => array.indexOf(value) === index && value !== issue)
 
   return applyKnownIssueCorrections(issue, {
@@ -364,7 +378,8 @@ function parseIssue(issue, html, finalUrl) {
     asunto,
     estado,
     prioridad,
-    responsable_actual: latestMovement?.responsable_actual || responsableActual,
+    responsable_actual: resolvedOwner,
+    responsable_cargo: parseRoleForAssignee(text, resolvedOwner),
     ultimo_movimiento: latestMovement?.ultimo_movimiento || latestAttachment || (actualizado ? `Actualizado el ${actualizado}` : ''),
     actualizado_en: actualizado,
     tramites_hijos: children,
@@ -396,6 +411,7 @@ function mergeIssueChain(rootIssue, relatedIssues) {
     ...rootIssue,
     estado: latest.estado || rootIssue.estado,
     responsable_actual: latest.responsable_actual || rootIssue.responsable_actual,
+    responsable_cargo: latest.responsable_cargo || rootIssue.responsable_cargo,
     ultimo_movimiento: latest.issue === rootIssue.issue
       ? latest.ultimo_movimiento
       : withIssuePrefix(latest).ultimo_movimiento,

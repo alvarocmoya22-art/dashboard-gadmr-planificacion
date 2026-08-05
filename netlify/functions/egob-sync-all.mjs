@@ -30,6 +30,7 @@ function changedPayload(process, egob) {
     egob_url: egob.url || `https://egobedoc.gadmriobamba.gob.ec:8081/issues/${egob.issue}`,
     egob_estado: egob.estado || null,
     egob_responsable_actual: egob.responsable_actual || null,
+    egob_responsable_cargo: egob.responsable_cargo || null,
     egob_ultimo_movimiento: egob.ultimo_movimiento || egob.actualizado_en || null,
     updated_at: new Date().toISOString(),
   }
@@ -39,6 +40,7 @@ function changedPayload(process, egob) {
     String(process.egob_url || '') !== String(payload.egob_url || '') ||
     String(process.egob_estado || '') !== String(payload.egob_estado || '') ||
     String(process.egob_responsable_actual || '') !== String(payload.egob_responsable_actual || '') ||
+    String(process.egob_responsable_cargo || '') !== String(payload.egob_responsable_cargo || '') ||
     String(process.egob_ultimo_movimiento || '') !== String(payload.egob_ultimo_movimiento || '')
   )
 
@@ -49,7 +51,7 @@ export default async function scheduledEgobSync() {
   const supabase = getSupabaseAdmin()
   const { data: processes, error } = await supabase
     .from('processes')
-    .select('id,codigo_proceso,nombre_proceso,documento_respaldo,egob_numero,egob_url,egob_estado,egob_responsable_actual,egob_ultimo_movimiento')
+    .select('id,codigo_proceso,nombre_proceso,documento_respaldo,egob_numero,egob_url,egob_estado,egob_responsable_actual,egob_responsable_cargo,egob_ultimo_movimiento')
     .eq('activo', true)
     .or('egob_numero.not.is.null,documento_respaldo.not.is.null')
 

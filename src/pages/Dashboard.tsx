@@ -1,5 +1,5 @@
 ﻿import { useMemo, useState } from 'react'
-import { AlertTriangle, ArrowRight, BriefcaseBusiness, CalendarClock, CheckCircle2, CircleGauge, ExternalLink, FileText, Flag, Layers3, Paperclip, Search, ShieldCheck } from 'lucide-react'
+import { AlertTriangle, ArrowRight, BriefcaseBusiness, CalendarClock, CheckCircle2, CircleGauge, ExternalLink, FileText, Flag, Layers3, Paperclip, Search } from 'lucide-react'
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 import { Link } from 'react-router-dom'
 import { Card, Badge } from '../components/ui'
@@ -38,6 +38,25 @@ export function Dashboard() {
     return acc
   }, {})), [processes])
 
+  const priorityData = useMemo(() => {
+    const colors: Record<string, string> = {
+      Alta: '#e84d4d',
+      Media: '#df8b2d',
+      Baja: '#4aa65b',
+      'Sin prioridad': '#94a3b8',
+    }
+    const totals = processes.reduce<Record<string, number>>((acc, item) => {
+      const name = repairMojibake(item.prioridad?.nombre ?? 'Sin prioridad')
+      acc[name] = (acc[name] ?? 0) + 1
+      return acc
+    }, {})
+
+    return ['Alta', 'Media', 'Baja', 'Sin prioridad']
+      .map((name) => ({ name, value: totals[name] ?? 0, color: colors[name] }))
+      .filter((item) => item.value > 0)
+  }, [processes])
+  const priorityMax = Math.max(...priorityData.map((item) => item.value), 1)
+
 
   const executivePortfolio = processes
     .filter((item) => repairMojibake(item.estado?.nombre) !== 'Finalizado')
@@ -59,6 +78,7 @@ export function Dashboard() {
       process.area?.nombre,
       process.egob_numero,
       process.egob_responsable_actual,
+      process.egob_responsable_cargo,
       process.egob_ultimo_movimiento,
       process.proxima_accion,
       latestComment,
@@ -76,17 +96,8 @@ export function Dashboard() {
     { label: 'Avance general', value: `${metrics.average}%`, note: 'Promedio institucional', icon: CircleGauge, tone: 'purple' },
   ]
 
-  const syncedWithEgob = processes.filter((item) => item.egob_ultimo_movimiento && item.egob_ultimo_movimiento !== 'Pendiente de sincronizar')
   const directorSignals = [
     { label: 'Comentarios internos', value: comments.length, detail: 'Ver trámites con notas cargadas por el equipo', to: '/procesos?comentarios=1' },
-  ]
-  const onTrack = metrics.active.filter((item) => item.semaforo !== 'Rojo' && item.semaforo !== 'Amarillo')
-  const signalTotal = Math.max(metrics.active.length, 1)
-  const followupSignals = [
-    { label: 'Requieren atención', value: metrics.overdue.length, detail: 'Vencidos o con semáforo rojo', color: '#e84d4d', width: `${Math.round((metrics.overdue.length / signalTotal) * 100)}%` },
-    { label: 'Revisión próxima', value: metrics.expiring.length, detail: 'Próximos 7 días', color: '#df8b2d', width: `${Math.round((metrics.expiring.length / signalTotal) * 100)}%` },
-    { label: 'En seguimiento estable', value: onTrack.length, detail: 'Activos sin alerta inmediata', color: '#168378', width: `${Math.round((onTrack.length / signalTotal) * 100)}%` },
-    { label: 'Con movimiento eGob', value: syncedWithEgob.length, detail: 'Ya registran último movimiento detectado', color: '#2f6bed', width: `${Math.round((syncedWithEgob.length / Math.max(processes.length, 1)) * 100)}%` },
   ]
   return <div className="dashboard-grid">
     <section className="kpi-grid">{kpis.map(({ label, value, note, icon: Icon, tone }) => <Card className={`kpi-card tone-${tone}`} key={label}><div className="kpi-icon"><Icon size={20} /></div><div><span>{repairMojibake(label)}</span><strong>{value}</strong><small>{repairMojibake(note)}</small></div></Card>)}</section>
@@ -102,9 +113,25 @@ export function Dashboard() {
         <small>{repairMojibake(item.detail)}</small>
       </Link>)}
     </section>
-    <section className="chart-grid">
-      <Card className="chart-card status-chart-card"><div className="card-heading"><div><p className="eyebrow">Distribución</p><h3>Trámites por estado</h3></div><Layers3 size={20} /></div><div className="donut-wrap"><ResponsiveContainer width="100%" height={260}><PieChart><Pie data={statusData} dataKey="value" nameKey="name" innerRadius={70} outerRadius={100} paddingAngle={4}>{statusData.map((item) => <Cell key={item.name} fill={item.color} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer><div className="donut-center"><strong>{processes.length}</strong><span>Total</span></div></div><div className="legend status-legend">{statusData.map((item) => <span key={item.name}><i style={{ background: item.color }} /><em>{repairMojibake(item.name)}</em><b>{item.value}</b></span>)}</div></Card>
-      <Card className="chart-card wide institutional-card"><div className="card-heading"><div><p className="eyebrow">Seguimiento</p><h3>Semáforo institucional de seguimiento</h3></div><ShieldCheck size={20} /></div><div className="signal-list">{followupSignals.map((item) => <article key={item.label} className="signal-row"><div className="signal-copy"><span>{item.label}</span><small>{item.detail}</small></div><strong>{item.value}</strong><div className="signal-track"><i style={{ width: item.width, background: item.color }} /></div></article>)}</div><div className="institutional-note"><strong>Lectura ejecutiva</strong><p>Este bloque muestra el nivel de atención requerido por el portafolio sin comparar direcciones ni generar rankings internos.</p></div></Card>
+    <section className="portfolio-composition-section">
+      <Card className="chart-card portfolio-composition-card">
+        <div className="card-heading"><div><p className="eyebrow">Composición</p><h3>Distribución del portafolio</h3></div><Layers3 size={20} /></div>
+        <div className="portfolio-composition-grid">
+          <div className="portfolio-status-panel">
+            <div className="subchart-heading"><strong>Por estado</strong><span>Situación actual de los trámites</span></div>
+            <div className="donut-wrap"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={statusData} dataKey="value" nameKey="name" innerRadius={70} outerRadius={100} paddingAngle={4}>{statusData.map((item) => <Cell key={item.name} fill={item.color} />)}</Pie><Tooltip /></PieChart></ResponsiveContainer><div className="donut-center"><strong>{processes.length}</strong><span>Total</span></div></div>
+            <div className="legend status-legend">{statusData.map((item) => <span key={item.name}><i style={{ background: item.color }} /><em>{repairMojibake(item.name)}</em><b>{item.value}</b></span>)}</div>
+          </div>
+          <div className="portfolio-priority-panel">
+            <div className="subchart-heading"><strong>Por prioridad</strong><span>Nivel de atención definido para el portafolio</span></div>
+            <div className="priority-bars">{priorityData.map((item) => <article className="priority-row" key={item.name}>
+              <div className="priority-row-copy"><span><i style={{ background: item.color }} />{item.name}</span><strong>{item.value}</strong></div>
+              <div className="priority-track"><i style={{ width: `${Math.max((item.value / priorityMax) * 100, 4)}%`, background: item.color }} /></div>
+              <small>{Math.round((item.value / Math.max(processes.length, 1)) * 100)}% del portafolio</small>
+            </article>)}</div>
+          </div>
+        </div>
+      </Card>
     </section>
     <section className="critical-section">
       <div className="section-title"><div><p className="eyebrow">Agenda del Director</p><h2>Vista ejecutiva de trámites</h2><span>{executivePortfolio.length} trámites activos con responsable eGob, último movimiento, comentario y adjunto disponible cuando exista · se muestran 6 por defecto</span></div><Link to="/procesos">Ver portafolio completo <ArrowRight size={16} /></Link></div>
@@ -117,16 +144,17 @@ export function Dashboard() {
         const areaName = repairMojibake(process.area?.nombre ?? 'Sin área')
         const processName = repairMojibake(process.nombre_proceso)
         const egobOwner = repairMojibake(process.egob_responsable_actual || 'Pendiente de sincronizar')
+        const egobRole = repairMojibake(process.egob_responsable_cargo || '')
         const commentText = repairMojibake(latestComment || 'Sin comentario interno')
         const movementText = repairMojibake(process.egob_ultimo_movimiento || 'Pendiente de sincronizar')
         const attachmentName = repairMojibake(latestAttachment?.nombre_archivo || 'Sin adjunto cargado')
         return <article className="critical-row" key={process.id}>
           <span className={`traffic traffic-${process.semaforo?.toLowerCase()}`} />
           <div className="critical-main">
-            <small>{process.codigo_proceso} · {areaName}</small>
+            <small>{egobNumber ? `eGob #${egobNumber}` : 'Sin número eGob'} · {areaName}</small>
             <strong>{processName}</strong>
             <span className="executive-info-line line-attachment"><Paperclip size={12} /><b>Último adjunto</b><em>{attachmentName}</em></span>
-            <span className="executive-info-line line-owner"><b>Actualmente con eGob</b><em>{egobOwner}</em></span>
+            <span className="executive-info-line line-owner"><b>Actualmente con eGob</b><em>{egobOwner}{egobRole ? ` · ${egobRole}` : ''}</em></span>
             <span className="executive-info-line line-comment"><b>Último comentario</b><em>{commentText}</em></span>
             <span className="executive-info-line line-movement"><b>Último movimiento eGob</b><em>{movementText}</em></span>
           </div>
