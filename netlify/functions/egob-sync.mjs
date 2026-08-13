@@ -476,12 +476,11 @@ function describePage(issue, html, url) {
     hijos: parsed.tramites_hijos,
     textLen: text.length,
     movimientos: movements.map((m) => ({ tipo: m.tipo, date: m.date, seq: m.seq, index: m.index, responsable: m.responsable })),
-    // Ventanas de texto alrededor de marcadores clave, para ver la estructura real.
-    muestras: ['Flujo de procesos', 'Asignado ha cambiado', 'Reasignaci', 'Reasignado', 'Documento', 'Archivad', 'Estado:']
-      .map((marker) => {
-        const i = text.search(new RegExp(marker, 'i'))
-        return i < 0 ? `«${marker}»: (no aparece)` : `«${marker}» @${i}: ${text.slice(i, i + 240).replace(/\n/g, ' ⏎ ')}`
-      }),
+    // Texto completo del flujo real, para reconstruir la gramatica de los bloques de movimiento.
+    flujo: (() => {
+      const i = text.search(/Flujo de procesos/i)
+      return i < 0 ? '(no aparece)' : text.slice(i, i + 14000).replace(/\n/g, ' ⏎ ')
+    })(),
   }
 }
 
