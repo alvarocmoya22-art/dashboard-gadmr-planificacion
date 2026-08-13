@@ -404,7 +404,8 @@ async function readRelatedIssues(jar, rootIssue, linkedIssues, visited = new Set
   return related
 }
 
-export async function loginAndReadIssue(issue) {
+// Abre sesion en eGob y devuelve la pagina raiz del tramite (con su cookie jar).
+async function openSession(issue) {
   const username = process.env.EGOB_USERNAME
   const password = process.env.EGOB_PASSWORD
   if (!username || !password) {
@@ -451,10 +452,62 @@ export async function loginAndReadIssue(issue) {
     throw error
   }
 
+  return { jar, page }
+}
+
+export async function loginAndReadIssue(issue) {
+  const { jar, page } = await openSession(issue)
   const rootIssue = parseIssue(issue, page.html, page.url)
   const relatedIssues = await readRelatedIssues(jar, issue, rootIssue.tramites_hijos)
-
   return mergeIssueChain(rootIssue, relatedIssues)
+}
+
+// Diagnostico: devuelve la estructura REAL de eGob (texto aplanado + movimientos extraidos)
+// para ajustar el parser contra la realidad. No escribe en ninguna base de datos.
+function describePage(issue, html, url) {
+  const text = stripText(html)
+  const parsed = parseIssue(issue, html, url)
+  const movements = extractMovements(issue, text)
+  return {
+    issue,
+    estado: parsed.estado,
+    responsable_actual: parsed.responsable_actual,
+    ultimo_movimiento: parsed.ultimo_movimiento,
+    hijos: parsed.tramites_hijos,
+    textLen: text.length,
+    movimientos: movements.map((m) => ({ tipo: m.tipo, date: m.date, seq: m.seq, index: m.index, responsable: m.responsable })),
+    // Ventanas de texto alrededor de marcadores clave, para ver la estructura real.
+    muestras: ['Flujo de procesos', 'Asignado ha cambiado', 'Reasignaci', 'Reasignado', 'Documento', 'Archivad', 'Estado:']
+      .map((marker) => {
+        const i = text.search(new RegExp(marker, 'i'))
+        return i < 0 ? `«${marker}»: (no aparece)` : `«${marker}» @${i}: ${text.slice(i, i + 240).replace(/\n/g, ' ⏎ ')}`
+      }),
+  }
+}
+
+export async function diagnoseIssue(issue) {
+  const { jar, page } = await openSession(issue)
+  const rootDesc = describePage(issue, page.html, page.url)
+
+  const childIds = [...new Set(rootDesc.hijos || [])].slice(0, 8)
+  const children = []
+  for (const child of childIds) {
+    const childPage = await follow(jar, `${EGOB_BASE_URL}/issues/${encodeURIComponent(child)}`)
+    if (childPage.url.includes('/cas/login') || !childPage.html.includes(`#${child}`)) continue
+    children.push(describePage(child, childPage.html, childPage.url))
+  }
+
+  const merged = await loginAndReadIssue(issue)
+  return {
+    root: rootDesc,
+    children,
+    RESULTADO_FINAL: {
+      responsable_actual: merged.responsable_actual,
+      estado: merged.estado,
+      ultimo_movimiento: merged.ultimo_movimiento,
+      tramites_revisados: merged.tramites_revisados?.length,
+    },
+  }
 }
 
 export async function handler(event) {
