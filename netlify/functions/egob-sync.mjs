@@ -1,4 +1,4 @@
-﻿import http from 'node:http'
+import http from 'node:http'
 import https from 'node:https'
 
 const EGOB_BASE_URL = process.env.EGOB_BASE_URL || 'https://egobedoc.gadmriobamba.gob.ec:8081'
@@ -10,41 +10,9 @@ const headers = {
   'cache-control': 'no-store',
 }
 
-function knownIssueData(issue) {
-  if (String(issue) === '1013958') {
-    return {
-      issue: '1013958',
-      url: `${EGOB_BASE_URL}/issues/1013958`,
-      asunto: 'SOLICITA LA DESMEMBRACION DEL PREDIO - 0007060',
-      estado: 'Nuevo',
-      prioridad: '',
-      responsable_actual: 'JUAN DIEGO REMACHE RIVERA',
-      responsable_cargo: 'DIRECTOR GENERAL DE GESTIÓN DE PLANIFICACIÓN, HÁBITAT Y DESARROLLO URBANÍSTICO',
-      ultimo_movimiento: 'Trámite 1217995: 2026-07-29 12:13 - Documento enviado a JUAN DIEGO REMACHE RIVERA',
-      actualizado_en: '2026-07-29 12:13',
-      tramites_hijos: ['1181024', '1217995'],
-      tramites_revisados: ['1013958', '1181024', '1217995'],
-      sincronizado_en: new Date().toISOString(),
-    }
-  }
-
-  if (String(issue) === '1120463') {
-    return {
-      issue: '1120463',
-      url: `${EGOB_BASE_URL}/issues/1120463`,
-      asunto: 'SOLICITA LA DESMEMBRACION DE LOTE DEL SR. FAUSTO GUAÑO N° 0012351',
-      estado: 'Nuevo',
-      prioridad: '',
-      responsable_actual: 'NATALIA ELIZABETH SUBIA ANDRADE',
-      ultimo_movimiento: 'Trámite 1213878: 2026-07-28 11:31 - Reasignación a NATALIA ELIZABETH SUBIA ANDRADE',
-      actualizado_en: '2026-07-28 11:31',
-      tramites_hijos: ['1213878'],
-      tramites_revisados: ['1120463', '1213878'],
-      sincronizado_en: new Date().toISOString(),
-    }
-  }
-  return null
-}
+// Caracteres validos dentro de un nombre propio en mayusculas (con acentos).
+const NAME_CHARS = "A-ZÁÉÍÓÚÑÜ"
+const DATE_TIME_RE = /\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}(?::\d{2})?/g
 
 class CookieJar {
   constructor() { this.cookies = new Map() }
@@ -140,6 +108,23 @@ function formAction(html, currentUrl) {
   return action ? absoluteUrl(action, currentUrl) : currentUrl
 }
 
+// Repara mojibake devolviendo texto UTF-8 limpio (no deja Ã, Â, â ni signos de reemplazo).
+// Reversa la mala interpretacion latin1<->utf8 y normaliza los acentos usuales del castellano.
+export function repairMojibake(value = '') {
+  let text = String(value ?? '')
+  for (let index = 0; index < 3 && /[ÃÂâ]/.test(text); index += 1) {
+    try {
+      const bytes = Uint8Array.from([...text].map((char) => char.charCodeAt(0) & 255))
+      const decoded = new TextDecoder('utf-8', { fatal: false }).decode(bytes)
+      if (decoded && decoded !== text && !decoded.includes('�')) text = decoded
+      else break
+    } catch {
+      break
+    }
+  }
+  return text.replace(/[�￼]+/g, "")
+}
+
 function decodeHtml(value = '') {
   return repairMojibake(value
     .replace(/&nbsp;/g, ' ')
@@ -152,31 +137,12 @@ function decodeHtml(value = '') {
     .replace(/&#x([a-f0-9]+);/gi, (_, code) => String.fromCharCode(parseInt(code, 16))))
 }
 
-function repairMojibake(value = '') {
-  return String(value)
-    .replace(/ÃƒÂ¡/g, 'Ã¡')
-    .replace(/ÃƒÂ©/g, 'Ã©')
-    .replace(/ÃƒÂ­/g, 'Ã­')
-    .replace(/ÃƒÂ³/g, 'Ã³')
-    .replace(/ÃƒÂº/g, 'Ãº')
-    .replace(/ÃƒÂ±/g, 'Ã±')
-    .replace(/ÃƒÂ/g, 'Ã')
-    .replace(/Ãƒâ€°/g, 'Ã‰')
-    .replace(/ÃƒÂ/g, 'Ã')
-    .replace(/Ãƒâ€œ/g, 'Ã“')
-    .replace(/ÃƒÅ¡/g, 'Ãš')
-    .replace(/Ãƒâ€˜/g, 'Ã‘')
-    .replace(/Ã‚Â·/g, 'Â·')
-    .replace(/Ã¢â‚¬â€/g, 'â€”')
-    .replace(/Ã¢â‚¬Â¦/g, 'â€¦')
-}
-
 function stripText(html) {
   return decodeHtml(html)
     .replace(/<script[\s\S]*?<\/script>/gi, ' ')
     .replace(/<style[\s\S]*?<\/style>/gi, ' ')
     .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/(p|li|tr|h1|h2|h3|div)>/gi, '\n')
+    .replace(/<\/(p|li|tr|h1|h2|h3|div|td|th)>/gi, '\n')
     .replace(/<[^>]+>/g, ' ')
     .replace(/[ \t]+/g, ' ')
     .replace(/\n\s+/g, '\n')
@@ -188,242 +154,236 @@ function escapeRegExp(value = '') {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
+// Limpia un fragmento capturado y devuelve solo el nombre propio (2 a 6 palabras en mayusculas).
+function cleanName(raw = '') {
+  let text = repairMojibake(raw).replace(/\s+/g, ' ').trim()
+  // Corta en el cargo entre parentesis o separadores estructurales.
+  text = text.split(/\s*[([|]/)[0]
+  text = text.split(/\s+[-–—]\s+/)[0]
+  // Corta al llegar a palabras clave que ya no forman parte del nombre.
+  text = text.replace(/\b(Nota|Estado|Prioridad|Fecha|Reasignaci|Documento|Asignado|Nueva|Archivado|No\s+hay|MEMORANDO|Adjuntos|Flujo|Creado|Actualizado)\b[\s\S]*$/i, '')
+  const namePattern = new RegExp(`[${NAME_CHARS}][${NAME_CHARS}.'’-]*(?:\\s+[${NAME_CHARS}][${NAME_CHARS}.'’-]*){1,6}`)
+  const match = text.match(namePattern)
+  return (match ? match[0] : text).replace(/\s+/g, ' ').trim()
+}
+
 function parseRoleForAssignee(text, assignee) {
   if (!assignee) return ''
-  const repairedText = repairMojibake(text)
-  const namePattern = escapeRegExp(repairMojibake(assignee)).replace(/\s+/g, '\\s+')
-  const match = repairedText.match(new RegExp(`${namePattern}\\s*\\(([^)\\n]{4,})\\)`, 'i'))
+  const namePattern = escapeRegExp(assignee).replace(/\s+/g, '\\s+')
+  const match = text.match(new RegExp(`${namePattern}\\s*\\(([^)\\n]{4,})\\)`, 'i'))
   return repairMojibake(match?.[1] || '').replace(/\s+/g, ' ').trim()
 }
 
 function matchBetween(text, start, end) {
-  const pattern = new RegExp(`${start}([\\s\\S]*?)${end}`, 'i')
+  const pattern = new RegExp(`${escapeRegExp(start)}([\\s\\S]*?)${escapeRegExp(end)}`, 'i')
   return text.match(pattern)?.[1]?.replace(/\s+/g, ' ').trim() || ''
 }
 
-function parseCurrentAssignee(text) {
-  const block = matchBetween(text, 'Reasignado/s:', 'Estado:')
-  if (!block) return ''
-  const reassigned = block.match(/([A-ZÃÃ‰ÃÃ“ÃšÃ‘ ]{6,}?)\s*\([^)]*\)\s*\(\s*Reasignado\s*\)/i)
-  if (reassigned) return reassigned[1].replace(/\s+/g, ' ').trim()
-  const archivedRemoved = block.replace(/\([^)]*Archivado[^)]*\)/gi, '')
-  const names = archivedRemoved.match(/[A-ZÃÃ‰ÃÃ“ÃšÃ‘]{2,}(?:\s+[A-ZÃÃ‰ÃÃ“ÃšÃ‘]{2,}){2,}/g)
-  return names?.at(-1)?.trim() || ''
-}
-
 function parseLatestAttachment(text) {
-  const block = matchBetween(text, 'Adjuntos subidos posterior al envÃ­o / Expediente', 'Flujo de procesos') || ''
-  const match = block.match(/([A-ZÃÃ‰ÃÃ“ÃšÃ‘0-9_.\- ]+\.(?:pdf|png|jpg|jpeg|rar|zip|docx?))\s*\([^)]+\)[\s\S]*?(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+[AP]M)/i)
+  const block = matchBetween(text, 'Adjuntos subidos posterior al envío / Expediente', 'Flujo de procesos') || ''
+  const match = block.match(/([A-ZÁÉÍÓÚÑ0-9_.\- ]+\.(?:pdf|png|jpg|jpeg|rar|zip|docx?))\s*\([^)]+\)[\s\S]*?(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+[AP]M)/i)
   return match ? `${match[2]} - ${match[1].replace(/\s+/g, ' ').trim()}` : ''
 }
 
-function parseLatestChildFlow(text) {
-  const block = matchBetween(text, 'TrÃ¡mite/s hijos', 'No hay mÃ¡s registros para mostrar') || matchBetween(text, 'Trámite/s hijos', 'No hay más registros para mostrar') || ''
-  if (!block) return null
+// ---------------------------------------------------------------------------
+// Motor de movimientos.
+// Un movimiento eGob se compone de: actor (encabezado, NO es el responsable),
+// numero de secuencia (#189), fecha-hora y un cuerpo con la accion realizada.
+// El responsable actual siempre es el DESTINATARIO indicado en el cuerpo,
+// nunca el actor del encabezado.
+// ---------------------------------------------------------------------------
 
-  const pattern = /([A-ZÁÉÍÓÚÑÃÃ‰ÃÃ“ÃšÃ‘ ]{4,}?)\s*-\s*MEMORANDO\s*#(\d+)[\s\S]*?(Nuevo|Enviado|Reasignado|Finalizado)?\s*(\d{4}-\d{2}-\d{2})/gi
+const MOVEMENT_MATCHERS = [
+  {
+    tipo: 'Reasignación',
+    // "Asignado ha cambiado de PERSONA A a PERSONA B" -> destinatario = PERSONA B
+    regex: /Asignado\s+ha\s+cambiado\s+de\s+.+?\s+a\s+([^\n<]+)/gi,
+    destino: (m) => cleanName(m[1]),
+    label: (name) => `Reasignación a ${name}`,
+  },
+  {
+    tipo: 'Reasignación',
+    // "Reasignación a PERSONA" / "Reasignado/s a PERSONA"
+    regex: /Reasignaci[oó]?n\s+a:?\s+([^\n<]+)/gi,
+    destino: (m) => cleanName(m[1]),
+    label: (name) => `Reasignación a ${name}`,
+  },
+  {
+    tipo: 'Reasignación',
+    regex: /Reasignad[oa]s?\s+a:?\s+([^\n<]+)/gi,
+    destino: (m) => cleanName(m[1]),
+    label: (name) => `Reasignación a ${name}`,
+  },
+  {
+    tipo: 'Documento enviado',
+    // "Documento enviado a PERSONA" (case-insensitive)
+    regex: /Documento\s+enviado\s+a\s+([^\n<]+)/gi,
+    destino: (m) => cleanName(m[1]),
+    label: (name) => `Documento enviado a ${name}`,
+  },
+  {
+    tipo: 'Nueva respuesta',
+    regex: /Nueva\s+respuesta/gi,
+    destino: () => '',
+    label: () => 'Nueva respuesta',
+  },
+  {
+    tipo: 'Archivado',
+    regex: /\bArchivad[oa]\b/gi,
+    destino: () => '',
+    label: () => 'Archivado',
+  },
+]
+
+// Busca fecha-hora y numero de secuencia mas cercanos al anclaje de la accion.
+function contextMetadata(text, anchorIndex) {
+  const before = text.slice(Math.max(0, anchorIndex - 600), anchorIndex)
+  const after = text.slice(anchorIndex, Math.min(text.length, anchorIndex + 200))
+  const dates = [...`${before}\n${after}`.matchAll(DATE_TIME_RE)].map((item) => item[0])
+  const date = (dates.at(-1) || '').replace(/\s+/g, ' ').trim()
+  // #189: secuencia del movimiento (1 a 4 digitos). Excluye numeros de tramite (5+ digitos).
+  const seqMatches = [...before.matchAll(/#(\d{1,4})(?!\d)/g)].map((item) => Number(item[1]))
+  const seq = seqMatches.length ? seqMatches.at(-1) : null
+  return { date, seq }
+}
+
+function movementTimestamp(date) {
+  if (!date) return 0
+  const dateTime = date.match(/(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2}(?::\d{2})?)/)
+  if (dateTime) return new Date(`${dateTime[1]}T${dateTime[2]}`).getTime()
+  const dayOnly = date.match(/(\d{4}-\d{2}-\d{2})/)
+  return dayOnly ? new Date(`${dayOnly[1]}T23:59`).getTime() : 0
+}
+
+// Extrae todos los movimientos de un texto plano (una pagina eGob ya aplanada).
+function extractMovements(issue, text) {
   const events = []
-  for (const match of block.matchAll(pattern)) {
-    const target = match[1].replace(/\s+/g, ' ').trim()
-    const memo = match[2]
-    const status = (match[3] || '').replace(/\s+/g, ' ').trim()
-    const date = match[4]
-    if (!target || !memo || !date) continue
-    events.push({
-      issue: memo,
-      date,
-      responsable_actual: target,
-      ultimo_movimiento: `${date} - MEMORANDO #${memo} dirigido a ${target}${status ? ` (${status})` : ''}`,
-    })
+  for (const matcher of MOVEMENT_MATCHERS) {
+    matcher.regex.lastIndex = 0
+    for (const match of text.matchAll(matcher.regex)) {
+      const anchor = match.index || 0
+      const responsable = matcher.destino(match)
+      // Las reasignaciones y envios exigen un destinatario valido.
+      if (matcher.tipo === 'Reasignación' || matcher.tipo === 'Documento enviado') {
+        if (!responsable) continue
+      }
+      const { date, seq } = contextMetadata(text, anchor)
+      events.push({
+        issue,
+        tipo: matcher.tipo,
+        responsable,
+        date,
+        seq,
+        index: anchor,
+        timestamp: movementTimestamp(date),
+        label: matcher.label(responsable),
+      })
+    }
   }
-
-  if (!events.length) return null
-  return events.at(-1)
+  return events
 }
 
-function parseLatestReassignment(text) {
-  const pattern = /Reasignaci[oÃ³?]n[\s\S]{0,500}?\(\s*(\d+)\s*\)[\s\S]{0,500}?(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})[\s\S]{0,700}?Asignado ha cambiado de\s+(.+?)\s+a\s+(.+?)(?:\n|$)/gi
-  const matches = [...text.matchAll(pattern)]
-  const latest = matches.at(-1)
-  if (!latest) return null
-  const to = latest[4].replace(/\s+/g, ' ').trim()
-  const date = latest[2].replace(/\s+/g, ' ').trim()
-  return {
-    responsable_actual: to,
-    ultimo_movimiento: `${date} - ReasignaciÃ³n a ${to}`,
-  }
+// Ordena por: fecha-hora, luego numero de secuencia (#), luego orden de aparicion (DOM).
+function isNewerMovement(candidate, current) {
+  if (!current) return true
+  if (candidate.timestamp !== current.timestamp) return candidate.timestamp > current.timestamp
+  const candidateSeq = candidate.seq ?? -1
+  const currentSeq = current.seq ?? -1
+  if (candidateSeq !== currentSeq) return candidateSeq > currentSeq
+  return candidate.index >= current.index
 }
 
-function parseLatestReassignmentFromBlocks(text) {
-  const blocks = text
-    .split(/\n(?=Reasignaci[oÃ³?]n\b)/i)
-    .filter((block) => /Reasignaci[oÃ³?]n/i.test(block) && /Asignado ha cambiado de/i.test(block))
-
-  const latest = blocks.at(-1)
-  if (!latest) return null
-
-  const date = latest.match(/(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})/)?.[1]?.replace(/\s+/g, ' ').trim() || ''
-  const assignment = latest.match(/Asignado ha cambiado de\s+(.+?)\s+a\s+([^\n]+)/i)
-  if (!assignment) return null
-
-  const to = assignment[2].replace(/\s+/g, ' ').trim()
-  return {
-    responsable_actual: to,
-    ultimo_movimiento: `${date} - ReasignaciÃ³n a ${to}`,
-  }
+function pickLatestMovement(events) {
+  return events.reduce((best, event) => (isNewerMovement(event, best) ? event : best), null)
 }
 
-function parseLatestReassignmentByAssignmentLine(text) {
-  const events = []
-  const sectionStarts = [...text.matchAll(/Reasignaci\S*n/gi)].map((match) => match.index || 0)
-  const sections = sectionStarts.length
-    ? sectionStarts.map((start, index) => text.slice(start, sectionStarts[index + 1] || text.length))
-    : [text]
-
-  for (const section of sections) {
-    if (!/Asignado ha cambiado de/i.test(section)) continue
-    const assignment = section.match(/Asignado ha cambiado de\s+(.+?)\s+a\s+(.+?)(?:\n|Nota:|No hay|Reasignaci\S*n|$)/i)
-    if (!assignment) continue
-    const dates = [...section.matchAll(/(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})/g)]
-    const issues = [...section.matchAll(/\(\s*(\d{5,})\s*\)/g)]
-    const date = dates.at(-1)?.[1]?.replace(/\s+/g, ' ').trim() || ''
-    const issue = issues.at(-1)?.[1] || ''
-    const to = assignment[2].replace(/\s+/g, ' ').trim()
-    if (!to) continue
-    events.push({
-      issue,
-      date,
-      responsable_actual: to,
-      ultimo_movimiento: `${date} - ReasignaciÃƒÂ³n a ${to}`,
-    })
-  }
-
-  if (!events.length) return null
-
-  return events.reduce((best, event) => {
-    const bestTime = best.date ? new Date(best.date.replace(' ', 'T')).getTime() : 0
-    const eventTime = event.date ? new Date(event.date.replace(' ', 'T')).getTime() : 0
-    return eventTime >= bestTime ? event : best
-  }, events[0])
+// El responsable actual es el destinatario del ultimo movimiento que asigna a alguien
+// (reasignacion o documento enviado). "Nueva respuesta"/"Archivado" no cambian el responsable.
+function pickLatestOwner(events) {
+  const withOwner = events.filter((event) => event.responsable)
+  return pickLatestMovement(withOwner)
 }
 
-function parseLatestDocumentSent(text) {
-  const events = []
-  const markerPattern = /Documento\s+Enviado\s+a\s+/gi
-  const markers = [...text.matchAll(markerPattern)]
-
-  for (const marker of markers) {
-    const start = marker.index || 0
-    const sectionStart = Math.max(
-      0,
-      text.lastIndexOf('\n', Math.max(0, start - 1)),
-      text.lastIndexOf('Archivado', start),
-      text.lastIndexOf('Reasignaci', start),
-    )
-    const sectionEnd = text.indexOf('\n', start)
-    const section = text.slice(sectionStart, sectionEnd > start ? sectionEnd : Math.min(text.length, start + 300))
-    const before = text.slice(Math.max(0, start - 700), start + 260)
-    const date = before.match(/(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})/g)?.at(-1) || ''
-    const issue = before.match(/\(\s*(\d{5,})\s*\)/g)?.at(-1)?.replace(/\D/g, '') || ''
-    const sentTo = section
-      .match(/Documento\s+Enviado\s+a\s+(.+?)(?:\n|$)/i)?.[1]
-      ?.replace(/\s+/g, ' ')
-      .trim()
-
-    if (!sentTo) continue
-
-    events.push({
-      issue,
-      date,
-      responsable_actual: sentTo,
-      ultimo_movimiento: `${date} - Documento enviado a ${sentTo}`,
-    })
-  }
-
-  if (!events.length) return null
-
-  return events.reduce((best, event) => {
-    const bestTime = best.date ? new Date(best.date.replace(' ', 'T')).getTime() : 0
-    const eventTime = event.date ? new Date(event.date.replace(' ', 'T')).getTime() : 0
-    return eventTime >= bestTime ? event : best
-  }, events[0])
+function formatMovement(event, rootIssue) {
+  if (!event) return ''
+  const prefix = event.issue && event.issue !== rootIssue ? `Trámite ${event.issue}: ` : ''
+  const seq = event.seq ? ` (#${event.seq})` : ''
+  const date = event.date ? `${event.date} - ` : ''
+  return `${prefix}${date}${event.label}${seq}`
 }
 
-
-function applyKnownIssueCorrections(issue, parsed) {
-  const known = knownIssueData(issue)
-  if (known && movementTime(known) > movementTime(parsed)) return { ...parsed, ...known }
-  return parsed
-}
 function parseIssue(issue, html, finalUrl) {
   const text = stripText(html)
   const estado = text.match(/Estado:\s*([^\n]+?)\s*Prioridad:/i)?.[1]?.trim() || ''
   const prioridad = text.match(/Prioridad:\s*([^\n]+?)\s*Fecha registro:/i)?.[1]?.trim() || ''
   const actualizado = text.match(/Actualizado el\s+(.+?)\s*\./i)?.[1]?.trim() || ''
   const asunto = text.match(/Asunto:\s*(.+?)\s*Creado por/i)?.[1]?.trim() || ''
-  const latestReassignment = parseLatestReassignmentByAssignmentLine(text) || parseLatestReassignmentFromBlocks(text) || parseLatestReassignment(text)
-  const latestDocumentSent = parseLatestDocumentSent(text)
-  const latestFlow = parseLatestChildFlow(text)
-  const responsableActual = latestReassignment?.responsable_actual || parseCurrentAssignee(text)
-  const latestAttachment = parseLatestAttachment(text)
-  const latestMovement = [latestReassignment, latestDocumentSent, latestFlow]
-    .filter(Boolean)
-    .reduce((best, item) => (movementTime(item) >= movementTime(best) ? item : best), latestReassignment || latestDocumentSent || latestFlow || null)
-  const resolvedOwner = latestMovement?.responsable_actual || responsableActual
-  const children = [...html.matchAll(/href=["']\/issues\/(\d+)["']/g)].map((item) => item[1]).filter((value, index, array) => array.indexOf(value) === index && value !== issue)
 
-  return applyKnownIssueCorrections(issue, {
+  const movements = extractMovements(issue, text)
+  const latestMovement = pickLatestMovement(movements)
+  const latestOwner = pickLatestOwner(movements)
+  const latestAttachment = parseLatestAttachment(text)
+
+  const children = [...html.matchAll(/href=["']\/issues\/(\d+)["']/g)]
+    .map((item) => item[1])
+    .filter((value, index, array) => array.indexOf(value) === index && value !== issue)
+
+  const responsable = latestOwner?.responsable || ''
+  const ultimoMovimiento = formatMovement(latestMovement, issue)
+    || latestAttachment
+    || (actualizado ? `Actualizado el ${actualizado}` : '')
+
+  return {
     issue,
     url: finalUrl || `${EGOB_BASE_URL}/issues/${issue}`,
     asunto,
-    estado,
+    estado: estado || latestMovement?.tipo || '',
     prioridad,
-    responsable_actual: resolvedOwner,
-    responsable_cargo: parseRoleForAssignee(text, resolvedOwner),
-    ultimo_movimiento: latestMovement?.ultimo_movimiento || latestAttachment || (actualizado ? `Actualizado el ${actualizado}` : ''),
+    responsable_actual: responsable,
+    responsable_cargo: parseRoleForAssignee(text, responsable),
+    ultimo_movimiento: ultimoMovimiento,
     actualizado_en: actualizado,
+    // timestamp/seq del movimiento seleccionado, para comparar entre madre e hijos.
+    _movement: latestMovement,
+    _owner: latestOwner,
     tramites_hijos: children,
     sincronizado_en: new Date().toISOString(),
-  })
-}
-
-function movementTime(issueData) {
-  const raw = issueData?.ultimo_movimiento || issueData?.actualizado_en || ''
-  const dateTime = String(raw).match(/(\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2})/)
-  if (dateTime) return new Date(dateTime[1].replace(' ', 'T')).getTime()
-  const date = String(raw).match(/(\d{4}-\d{2}-\d{2})/)
-  return date ? new Date(`${date[1]}T23:59`).getTime() : 0
-}
-
-function withIssuePrefix(issueData) {
-  if (!issueData?.ultimo_movimiento) return issueData
-  return {
-    ...issueData,
-    ultimo_movimiento: `TrÃ¡mite ${issueData.issue}: ${issueData.ultimo_movimiento}`,
   }
 }
 
+// Combina la cadena madre + hijos escogiendo el movimiento realmente mas reciente de TODA la cadena.
 function mergeIssueChain(rootIssue, relatedIssues) {
   const candidates = [rootIssue, ...relatedIssues].filter(Boolean)
-  const latest = candidates.reduce((best, item) => (movementTime(item) > movementTime(best) ? item : best), rootIssue)
+
+  const allMovements = candidates.flatMap((item) => (item._movement ? [item._movement] : []))
+  const latestMovement = pickLatestMovement(allMovements)
+
+  const allOwners = candidates.flatMap((item) => (item._owner ? [item._owner] : []))
+  const latestOwner = pickLatestOwner(allOwners)
+
+  // El estado/cargo se toma del tramite donde ocurrio el ultimo movimiento con responsable.
+  const ownerIssue = candidates.find((item) => item.issue === latestOwner?.issue) || rootIssue
+  const movementIssue = candidates.find((item) => item.issue === latestMovement?.issue) || rootIssue
 
   return {
-    ...rootIssue,
-    estado: latest.estado || rootIssue.estado,
-    responsable_actual: latest.responsable_actual || rootIssue.responsable_actual,
-    responsable_cargo: latest.responsable_cargo || rootIssue.responsable_cargo,
-    ultimo_movimiento: latest.issue === rootIssue.issue
-      ? latest.ultimo_movimiento
-      : withIssuePrefix(latest).ultimo_movimiento,
-    actualizado_en: latest.actualizado_en || rootIssue.actualizado_en,
+    issue: rootIssue.issue,
+    url: rootIssue.url,
+    asunto: rootIssue.asunto,
+    estado: movementIssue.estado || rootIssue.estado,
+    prioridad: rootIssue.prioridad,
+    responsable_actual: latestOwner?.responsable || rootIssue.responsable_actual,
+    responsable_cargo: ownerIssue.responsable_cargo || rootIssue.responsable_cargo,
+    ultimo_movimiento: formatMovement(latestMovement, rootIssue.issue) || rootIssue.ultimo_movimiento,
+    actualizado_en: movementIssue.actualizado_en || rootIssue.actualizado_en,
     tramites_hijos: [...new Set(candidates.flatMap((item) => item.tramites_hijos || []).filter((item) => item !== rootIssue.issue))],
     tramites_revisados: candidates.map((item) => item.issue),
+    sincronizado_en: new Date().toISOString(),
   }
 }
 
 async function readRelatedIssues(jar, rootIssue, linkedIssues, visited = new Set([rootIssue])) {
   const related = []
-  const queue = [...new Set(linkedIssues || [])].filter((item) => item && !visited.has(item)).slice(0, 10)
+  const queue = [...new Set(linkedIssues || [])].filter((item) => item && !visited.has(item)).slice(0, 12)
 
   while (queue.length) {
     const issue = queue.shift()
@@ -437,7 +397,7 @@ async function readRelatedIssues(jar, rootIssue, linkedIssues, visited = new Set
     related.push(parsed)
 
     for (const child of parsed.tramites_hijos || []) {
-      if (!visited.has(child) && queue.length < 10) queue.push(child)
+      if (!visited.has(child) && queue.length < 12) queue.push(child)
     }
   }
 
@@ -445,12 +405,9 @@ async function readRelatedIssues(jar, rootIssue, linkedIssues, visited = new Set
 }
 
 export async function loginAndReadIssue(issue) {
-  const known = knownIssueData(issue)
-
   const username = process.env.EGOB_USERNAME
   const password = process.env.EGOB_PASSWORD
   if (!username || !password) {
-    if (known) return known
     const error = new Error('Faltan EGOB_USERNAME y EGOB_PASSWORD en variables de entorno.')
     error.statusCode = 500
     throw error
@@ -467,7 +424,7 @@ export async function loginAndReadIssue(issue) {
     params.set('execution', inputValue(page.html, 'execution'))
     params.set('_eventId', inputValue(page.html, '_eventId') || 'submit')
     params.set('geolocation', '')
-    params.set('submit', 'INICIAR SESIÃ“N')
+    params.set('submit', 'INICIAR SESIÓN')
 
     page = await follow(jar, formAction(page.html, page.url), {
       method: 'POST',
@@ -482,14 +439,14 @@ export async function loginAndReadIssue(issue) {
 
   if (page.url.includes('/cas/login') || /Introduzca su nombre de usuario/i.test(page.html)) {
     const loginText = stripText(page.html)
-    const visibleReason = loginText.match(/(Credenciales[\s\S]{0,120}|Autenticaci[oÃ³]n[\s\S]{0,120}|inv[aÃ¡]lid[\s\S]{0,120}|requerido[\s\S]{0,120})/i)?.[0]
-    const error = new Error(`No se pudo iniciar sesiÃ³n en eGob. ${visibleReason ? `Mensaje: ${visibleReason}` : 'Revisa usuario, contraseÃ±a o permisos.'}`)
+    const visibleReason = loginText.match(/(Credenciales[\s\S]{0,120}|Autenticaci[oó]n[\s\S]{0,120}|inv[aá]lid[\s\S]{0,120}|requerido[\s\S]{0,120})/i)?.[0]
+    const error = new Error(`No se pudo iniciar sesión en eGob. ${visibleReason ? `Mensaje: ${visibleReason}` : 'Revisa usuario, contraseña o permisos.'}`)
     error.statusCode = 401
     throw error
   }
 
   if (!page.html.includes(`MEMORANDO #${issue}`) && !page.html.includes(`#${issue}`)) {
-    const error = new Error(`No se encontrÃ³ el trÃ¡mite eGob ${issue}.`)
+    const error = new Error(`No se encontró el trámite eGob ${issue}.`)
     error.statusCode = 404
     throw error
   }
@@ -503,7 +460,7 @@ export async function loginAndReadIssue(issue) {
 export async function handler(event) {
   try {
     const issue = event.queryStringParameters?.issue?.replace(/\D/g, '')
-    if (!issue) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Falta el parÃ¡metro issue.' }) }
+    if (!issue) return { statusCode: 400, headers, body: JSON.stringify({ error: 'Falta el parámetro issue.' }) }
     const data = await loginAndReadIssue(issue)
     return { statusCode: 200, headers, body: JSON.stringify(data) }
   } catch (error) {
@@ -515,4 +472,15 @@ export async function handler(event) {
   }
 }
 
-
+// Exportado para pruebas locales con fixtures HTML (sin red).
+export const __test__ = {
+  stripText,
+  cleanName,
+  repairMojibake,
+  extractMovements,
+  pickLatestMovement,
+  pickLatestOwner,
+  parseIssue,
+  mergeIssueChain,
+  formatMovement,
+}

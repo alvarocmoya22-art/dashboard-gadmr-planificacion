@@ -6,52 +6,82 @@ const headers = {
   'cache-control': 'no-store',
 }
 
+// La campana del frontend filtra process_change_log por campos que empiezan por "egob_".
+// Para que un movimiento nuevo genere UNA sola notificacion (y no una por cada columna que
+// cambia), se emite una unica fila representativa, por orden de prioridad.
+const NOTIFY_FIELD_PRIORITY = ['egob_ultimo_movimiento', 'egob_responsable_actual', 'egob_estado']
+
 function getSupabaseAdmin() {
   const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL
   const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
   if (!url || !serviceKey) {
-    throw new Error('Faltan SUPABASE_URL/VITE_SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY en Netlify.')
+    throw new Error('Faltan SUPABASE_URL/VITE_SUPABASE_URL y SUPABASE_SERVICE_ROLE_KEY en el entorno.')
   }
   return createClient(url, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
 }
 
-function getIssueNumber(process) {
+export function getIssueNumber(process) {
   const explicit = String(process.egob_numero || '').replace(/\D/g, '')
   if (explicit) return explicit
   const matches = [...String(process.documento_respaldo || '').matchAll(/\b\d{5,}\b/g)].map((match) => match[0])
   return matches.at(-1) || ''
 }
 
-function changedPayload(process, egob) {
-  const payload = {
-    egob_numero: egob.issue || getIssueNumber(process),
-    egob_url: egob.url || `https://egobedoc.gadmriobamba.gob.ec:8081/issues/${egob.issue}`,
-    egob_estado: egob.estado || null,
-    egob_responsable_actual: egob.responsable_actual || null,
-    egob_responsable_cargo: egob.responsable_cargo || null,
-    egob_ultimo_movimiento: egob.ultimo_movimiento || egob.actualizado_en || null,
-    updated_at: new Date().toISOString(),
+const clean = (value) => String(value ?? '').trim()
+
+// Funcion pura y testeable: compara lo que hay en Supabase con lo leido en eGob.
+// Devuelve el payload de actualizacion + la lista de cambios (para change_log/notificaciones),
+// o null si no hay ningun cambio real (evita updates y notificaciones duplicadas).
+// No sobrescribe un valor valido existente con un valor vacio (evita "Pendiente de sincronizar").
+export function computeEgobUpdate(process, egob, nowIso = new Date().toISOString()) {
+  const next = {
+    egob_numero: clean(egob.issue) || getIssueNumber(process),
+    egob_url: clean(egob.url) || `https://egobedoc.gadmriobamba.gob.ec:8081/issues/${clean(egob.issue) || getIssueNumber(process)}`,
+    egob_estado: clean(egob.estado),
+    egob_responsable_actual: clean(egob.responsable_actual),
+    egob_responsable_cargo: clean(egob.responsable_cargo),
+    egob_ultimo_movimiento: clean(egob.ultimo_movimiento) || clean(egob.actualizado_en),
   }
 
-  const hasChanges = (
-    String(process.egob_numero || '') !== String(payload.egob_numero || '') ||
-    String(process.egob_url || '') !== String(payload.egob_url || '') ||
-    String(process.egob_estado || '') !== String(payload.egob_estado || '') ||
-    String(process.egob_responsable_actual || '') !== String(payload.egob_responsable_actual || '') ||
-    String(process.egob_responsable_cargo || '') !== String(payload.egob_responsable_cargo || '') ||
-    String(process.egob_ultimo_movimiento || '') !== String(payload.egob_ultimo_movimiento || '')
-  )
+  const payload = {}
+  let hasChanges = false
 
-  return hasChanges ? payload : null
+  for (const key of Object.keys(next)) {
+    const previous = clean(process[key])
+    const value = next[key]
+    // Nunca borrar un dato valido existente con vacio.
+    if (!value && previous) continue
+    if (value !== previous) {
+      payload[key] = value || null
+      hasChanges = true
+    }
+  }
+
+  if (!hasChanges) return null
+
+  // Una unica notificacion por movimiento: la fila representativa de mayor prioridad.
+  const notifyField = NOTIFY_FIELD_PRIORITY.find((campo) => campo in payload)
+  const changes = notifyField
+    ? [{
+        campo: notifyField,
+        valor_anterior: clean(process[notifyField]) || null,
+        valor_nuevo: payload[notifyField],
+      }]
+    : []
+
+  payload.egob_sincronizado_en = nowIso
+  payload.updated_at = nowIso
+
+  return { payload, changes }
 }
 
 export default async function scheduledEgobSync() {
   const supabase = getSupabaseAdmin()
   const { data: processes, error } = await supabase
     .from('processes')
-    .select('id,codigo_proceso,nombre_proceso,documento_respaldo,egob_numero,egob_url,egob_estado,egob_responsable_actual,egob_responsable_cargo,egob_ultimo_movimiento')
+    .select('id,codigo_proceso,nombre_proceso,documento_respaldo,egob_numero,egob_url,egob_estado,egob_responsable_actual,egob_responsable_cargo,egob_ultimo_movimiento,egob_sincronizado_en')
     .eq('activo', true)
     .or('egob_numero.not.is.null,documento_respaldo.not.is.null')
 
@@ -60,8 +90,10 @@ export default async function scheduledEgobSync() {
   const summary = {
     checked: 0,
     updated: 0,
+    unchanged: 0,
     skipped: 0,
     errors: [],
+    audit: [],
   }
 
   for (const process of processes || []) {
@@ -74,15 +106,44 @@ export default async function scheduledEgobSync() {
     summary.checked += 1
     try {
       const egob = await loginAndReadIssue(issue)
-      const payload = changedPayload(process, egob)
-      if (!payload) continue
+      const result = computeEgobUpdate(process, egob)
+
+      const auditRow = {
+        egob_numero: egob.issue || issue,
+        codigo_proceso: process.codigo_proceso,
+        responsable_anterior: process.egob_responsable_actual || '(vacío)',
+        responsable_egob: egob.responsable_actual || '(no detectado)',
+        ultimo_movimiento: egob.ultimo_movimiento || '(sin movimiento)',
+        coincide: clean(process.egob_responsable_actual) === clean(egob.responsable_actual) ? 'sí' : 'no',
+        tramites_revisados: (egob.tramites_revisados || [issue]).join(', '),
+        accion: result ? 'actualizado' : 'sin cambios',
+      }
+      summary.audit.push(auditRow)
+
+      if (!result) {
+        summary.unchanged += 1
+        continue
+      }
 
       const { error: updateError } = await supabase
         .from('processes')
-        .update(payload)
+        .update(result.payload)
         .eq('id', process.id)
 
       if (updateError) throw updateError
+
+      // Una fila de change_log por cada campo eGob que cambio -> alimenta la campana sin duplicar.
+      if (result.changes.length) {
+        const rows = result.changes.map((change) => ({
+          process_id: process.id,
+          campo: change.campo,
+          valor_anterior: change.valor_anterior,
+          valor_nuevo: change.valor_nuevo,
+        }))
+        const { error: logError } = await supabase.from('process_change_log').insert(rows)
+        if (logError) throw logError
+      }
+
       summary.updated += 1
     } catch (error) {
       summary.errors.push({
@@ -96,7 +157,8 @@ export default async function scheduledEgobSync() {
   return new Response(JSON.stringify(summary), { status: 200, headers })
 }
 
-// Netlify ejecuta los cron en UTC. Ecuador es UTC-5, por eso 07:00 Ecuador = 12:00 UTC.
+// GitHub Actions ejecuta el cron (ver .github/workflows/egob-sync.yml). Este bloque se conserva
+// por compatibilidad con Netlify, aunque la app ya no depende de Netlify.
 export const config = {
   schedule: '0 12 * * *',
 }
