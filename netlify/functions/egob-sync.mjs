@@ -223,11 +223,15 @@ const OWNER_TYPES = new Set(['Reasignación'])
 //   "Asignado ha cambiado de <ACTOR> a <DESTINATARIO>"  (el actor entrega; el "a" recibe)
 //   "Asignado ha establecido a <DESTINATARIO>"          (asignacion inicial)
 // El actor del encabezado es quien ENTREGA, no quien recibe.
+// Palabras que NO son personas (estados/prioridades) y nunca deben tomarse como responsable.
+const NON_PERSON = /^(Urgente|Finalizado|Finalizada|Nuevo|Nueva|Normal|Alta|Media|Baja|Pendiente|En\s|Archivad|Resuelt|Respondi|Cerrad|Anulad)/i
+
 function extractDestinatario(block) {
-  const cambiado = block.match(/cambiado de\s+[^\n]{2,70}?\s+a\s+([A-ZÁÉÍÓÚÑÜ][^\n(]{3,70})/)
-  if (cambiado) return cleanName(cambiado[1])
-  const establecido = block.match(/establecido a\s+([A-ZÁÉÍÓÚÑÜ][^\n(]{3,70})/)
-  if (establecido) return cleanName(establecido[1])
+  // Debe ser un cambio de ASIGNACION real (no un cambio de estado/prioridad).
+  const cambiado = block.match(/Asignado\s+ha\s+cambiado\s+de\s+[^\n]{2,70}?\s+a\s+([A-ZÁÉÍÓÚÑÜ][^\n(]{3,70})/)
+  if (cambiado) { const n = cleanName(cambiado[1]); if (n && !NON_PERSON.test(n)) return n }
+  const establecido = block.match(/Asignado\s+ha\s+establecido\s+a\s+([A-ZÁÉÍÓÚÑÜ][^\n(]{3,70})/)
+  if (establecido) { const n = cleanName(establecido[1]); if (n && !NON_PERSON.test(n)) return n }
   return ''
 }
 

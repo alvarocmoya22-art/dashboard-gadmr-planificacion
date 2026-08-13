@@ -31,6 +31,9 @@ export function getIssueNumber(process) {
 
 const clean = (value) => String(value ?? '').trim()
 
+// Palabras que no son personas (estados/prioridades) coladas como responsable en corridas previas.
+const NON_PERSON_OWNER = /^(Urgente|Finalizad[oa]|Nuev[oa]|Normal|Alta|Media|Baja|Pendiente|Archivad|Resuelt|Respondi|Cerrad|Anulad|En\s)/i
+
 // Funcion pura y testeable: compara lo que hay en Supabase con lo leido en eGob.
 // Devuelve el payload de actualizacion + la lista de cambios (para change_log/notificaciones),
 // o null si no hay ningun cambio real (evita updates y notificaciones duplicadas).
@@ -51,8 +54,11 @@ export function computeEgobUpdate(process, egob, nowIso = new Date().toISOString
   for (const key of Object.keys(next)) {
     const previous = clean(process[key])
     const value = next[key]
+    // Un responsable que sea una palabra de estado/prioridad (p. ej. "Urgente",
+    // "Finalizado") es invalido: no debe preservarse aunque el nuevo valor sea vacio.
+    const previousInvalid = key === 'egob_responsable_actual' && NON_PERSON_OWNER.test(previous)
     // Nunca borrar un dato valido existente con vacio.
-    if (!value && previous) continue
+    if (!value && previous && !previousInvalid) continue
     if (value !== previous) {
       payload[key] = value || null
       hasChanges = true
