@@ -125,10 +125,18 @@ export default async function scheduledEgobSync() {
         continue
       }
 
-      const { error: updateError } = await supabase
+      let { error: updateError } = await supabase
         .from('processes')
         .update(result.payload)
         .eq('id', process.id)
+
+      // Si la migracion egob_sincronizado_en aun no se aplico en la BD, reintenta sin esa columna
+      // en vez de fallar (la sincronizacion sigue funcionando).
+      if (updateError && /egob_sincronizado_en/.test(String(updateError.message || ''))) {
+        const { egob_sincronizado_en, ...rest } = result.payload
+        void egob_sincronizado_en
+        ;({ error: updateError } = await supabase.from('processes').update(rest).eq('id', process.id))
+      }
 
       if (updateError) throw updateError
 
