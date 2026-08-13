@@ -6,10 +6,10 @@ import { computeEgobUpdate } from '../netlify/functions/egob-sync-all.mjs'
 const { parseIssue, mergeIssueChain, extractMovements, stripText } = __test__
 
 // --- Fixtures con la estructura REAL del "Flujo de procesos" de eGob ---------
-// Cada bloque de movimiento: TIPO ( tramite ) #seq  ACTOR (cargo)  FECHA HORA.
-// El ACTOR del encabezado es la persona a la que quedó asignado el tramite.
-function blockHtml({ tipo = 'Reasignación', issue, seq, actor, cargo = 'FUNCIONARIO', date }) {
-  return [
+// Cada bloque: TIPO ( tramite ) #seq  ACTOR (cargo)  FECHA  Nota  "Asignado ha cambiado de ACTOR a DESTINO".
+// El ACTOR entrega el tramite; el DESTINO (tras "a") es el nuevo responsable.
+function blockHtml({ tipo = 'Reasignación', issue, seq, actor = 'JOHN HENRY VINUEZA SALINAS', destino, cargo = 'FUNCIONARIO', date }) {
+  const rows = [
     `<tr><td>${tipo}</td></tr>`,
     `<tr><td>( ${issue} )</td></tr>`,
     `<tr><td>#${seq}</td></tr>`,
@@ -17,7 +17,9 @@ function blockHtml({ tipo = 'Reasignación', issue, seq, actor, cargo = 'FUNCION
     `<tr><td>(${cargo})</td></tr>`,
     `<tr><td>${date}</td></tr>`,
     `<tr><td>Nota: detalle del movimiento</td></tr>`,
-  ].join('\n')
+  ]
+  if (destino && tipo === 'Reasignación') rows.push(`<tr><td>Asignado ha cambiado de ${actor} a ${destino}</td></tr>`)
+  return rows.join('\n')
 }
 
 // Barra lateral que aparece en TODAS las paginas eGob (usuario logueado + menus).
@@ -40,17 +42,17 @@ function issueHtml({ issue, estado = 'Nuevo', blocks = [], links = [] }) {
   </body></html>`
 }
 
-// --- 1. Reasignación: responsable = actor del bloque (caso real 914830/1213382)
-test('1. Reasignación toma el actor del bloque como responsable', () => {
+// --- 1. Reasignación: responsable = DESTINATARIO tras "a" (caso real 914830/1213382)
+test('1. Reasignación toma el destinatario ("a"), no el actor que entrega', () => {
   const html = issueHtml({
     issue: '1213382',
     estado: 'Nuevo',
-    blocks: [{ issue: '1213382', seq: 3, actor: 'MARIA ALEJANDRA BONIFAZ LÓPEZ', cargo: 'Jefe de Habilitación de Suelo y Edificación', date: '2026-07-27 17:45' }],
+    blocks: [{ issue: '1213382', seq: 3, actor: 'JUAN DIEGO REMACHE RIVERA', destino: 'MARIA ALEJANDRA BONIFAZ LÓPEZ', date: '2026-07-27 17:45' }],
   })
   const parsed = parseIssue('1213382', html)
   assert.equal(parsed.responsable_actual, 'MARIA ALEJANDRA BONIFAZ LÓPEZ')
   assert.match(parsed.ultimo_movimiento, /Reasignación a MARIA ALEJANDRA BONIFAZ LÓPEZ/)
-  assert.match(parsed.responsable_cargo, /Habilitación de Suelo/)
+  assert.doesNotMatch(parsed.responsable_actual, /JUAN DIEGO/)
 })
 
 // --- 2. La barra lateral y el usuario logueado NO se cuelan como movimiento ---
@@ -65,9 +67,9 @@ test('3. Con varias reasignaciones escoge la de fecha más reciente', () => {
   const html = issueHtml({
     issue: '900001',
     blocks: [
-      { issue: '900001', seq: 2, actor: 'PEDRO PEREZ MORA', date: '2026-03-01 09:00' },
-      { issue: '900001', seq: 8, actor: 'LUISA TORRES VACA', date: '2026-07-15 14:30' },
-      { issue: '900001', seq: 5, actor: 'ANA GOMEZ SALAS', date: '2026-05-10 11:00' },
+      { issue: '900001', seq: 2, actor: 'JOHN HENRY VINUEZA SALINAS', destino: 'PEDRO PEREZ MORA', date: '2026-03-01 09:00' },
+      { issue: '900001', seq: 8, actor: 'PEDRO PEREZ MORA', destino: 'LUISA TORRES VACA', date: '2026-07-15 14:30' },
+      { issue: '900001', seq: 5, actor: 'PEDRO PEREZ MORA', destino: 'ANA GOMEZ SALAS', date: '2026-05-10 11:00' },
     ],
   })
   const parsed = parseIssue('900001', html)
@@ -79,8 +81,8 @@ test('4. Con igual fecha-hora, escoge el número de movimiento mayor', () => {
   const html = issueHtml({
     issue: '900002',
     blocks: [
-      { issue: '900002', seq: 12, actor: 'CARLOS RUIZ LEON', date: '2026-07-20 10:00' },
-      { issue: '900002', seq: 25, actor: 'DIANA MORA PAZ', date: '2026-07-20 10:00' },
+      { issue: '900002', seq: 12, actor: 'JOHN HENRY VINUEZA SALINAS', destino: 'CARLOS RUIZ LEON', date: '2026-07-20 10:00' },
+      { issue: '900002', seq: 25, actor: 'CARLOS RUIZ LEON', destino: 'DIANA MORA PAZ', date: '2026-07-20 10:00' },
     ],
   })
   const parsed = parseIssue('900002', html)
@@ -92,11 +94,11 @@ test('4. Con igual fecha-hora, escoge el número de movimiento mayor', () => {
 test('5. Cadena madre/hijos: responsable del último Reasignación; Archivado no lo cambia', () => {
   const root = parseIssue('914830', issueHtml({
     issue: '914830', estado: 'En trámite', links: ['1213382', '1100000'],
-    blocks: [{ issue: '914830', seq: 8, actor: 'JUAN DIEGO REMACHE RIVERA', date: '2025-04-25 18:00' }],
+    blocks: [{ issue: '914830', seq: 8, actor: 'JOHN HENRY VINUEZA SALINAS', destino: 'JUAN DIEGO REMACHE RIVERA', date: '2025-04-25 18:00' }],
   }))
   const child1 = parseIssue('1213382', issueHtml({
     issue: '1213382',
-    blocks: [{ issue: '1213382', seq: 3, actor: 'MARIA ALEJANDRA BONIFAZ LÓPEZ', date: '2026-07-27 17:45' }],
+    blocks: [{ issue: '1213382', seq: 3, actor: 'JUAN DIEGO REMACHE RIVERA', destino: 'MARIA ALEJANDRA BONIFAZ LÓPEZ', date: '2026-07-27 17:45' }],
   }))
   // Hijo con un Archivado posterior: NO debe cambiar el responsable.
   const child2 = parseIssue('1100000', issueHtml({

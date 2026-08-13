@@ -170,8 +170,13 @@ function cleanName(raw = '') {
 function parseRoleForAssignee(text, assignee) {
   if (!assignee) return ''
   const namePattern = escapeRegExp(assignee).replace(/\s+/g, '\\s+')
-  const match = text.match(new RegExp(`${namePattern}\\s*\\(([^)\\n]{4,})\\)`, 'i'))
-  return repairMojibake(match?.[1] || '').replace(/\s+/g, ' ').trim()
+  const re = new RegExp(`${namePattern}\\s*\\(([^)\\n]{4,120})\\)`, 'gi')
+  for (const match of text.matchAll(re)) {
+    const cargo = repairMojibake(match[1]).replace(/\s+/g, ' ').trim()
+    // El cargo debe tener letras (evita capturar numeros de tramite como "( 1131364 )").
+    if (/[A-Za-zÁÉÍÓÚÑ]/.test(cargo) && !/^[\d\s]+$/.test(cargo)) return cargo
+  }
+  return ''
 }
 
 function matchBetween(text, start, end) {
@@ -211,8 +216,20 @@ const HEADER_RE = new RegExp(
   'g',
 )
 
-// Solo estos tipos definen quien tiene el tramite (su actor es el nuevo responsable/holder).
+// Solo estos tipos cambian a quien esta asignado el tramite.
 const OWNER_TYPES = new Set(['Reasignación'])
+
+// Dentro de un bloque de reasignacion, el DESTINATARIO (nuevo responsable) aparece en:
+//   "Asignado ha cambiado de <ACTOR> a <DESTINATARIO>"  (el actor entrega; el "a" recibe)
+//   "Asignado ha establecido a <DESTINATARIO>"          (asignacion inicial)
+// El actor del encabezado es quien ENTREGA, no quien recibe.
+function extractDestinatario(block) {
+  const cambiado = block.match(/cambiado de\s+[^\n]{2,70}?\s+a\s+([A-ZÁÉÍÓÚÑÜ][^\n(]{3,70})/)
+  if (cambiado) return cleanName(cambiado[1])
+  const establecido = block.match(/establecido a\s+([A-ZÁÉÍÓÚÑÜ][^\n(]{3,70})/)
+  if (establecido) return cleanName(establecido[1])
+  return ''
+}
 
 function normalizeTipo(tipo) {
   return tipo.replace('Reasignacion', 'Reasignación')
@@ -232,24 +249,33 @@ function movementTimestamp(date) {
 }
 
 // Extrae todos los bloques de movimiento del texto plano de una pagina eGob.
+// Encabezado -> fecha/#/tramite/actor (fiables). Destinatario -> del detalle del bloque.
 function extractMovements(_issue, text) {
+  const headers = [...text.matchAll(HEADER_RE)]
   const events = []
-  for (const match of text.matchAll(HEADER_RE)) {
+  for (let i = 0; i < headers.length; i += 1) {
+    const match = headers[i]
+    const start = match.index || 0
+    const end = start + match[0].length
+    const nextStart = i + 1 < headers.length ? (headers[i + 1].index || text.length) : text.length
+    const block = text.slice(end, nextStart)
+
     const tipo = normalizeTipo(match[1])
-    const blockIssue = match[2]
-    const seq = Number(match[3])
-    const responsable = cleanName(match[4])
-    const cargo = repairMojibake(match[5] || '').replace(/\s+/g, ' ').trim()
     const date = match[6].replace(/\s+/g, ' ').trim()
-    if (!responsable) continue
+    // El responsable es el DESTINATARIO del detalle; el actor del encabezado solo entrega.
+    const responsable = OWNER_TYPES.has(tipo) ? extractDestinatario(block) : ''
+    // Cargo del destinatario: se busca donde aparezca "DESTINATARIO (cargo)" en la pagina.
+    const cargo = responsable ? parseRoleForAssignee(text, responsable) : ''
+
     events.push({
-      issue: blockIssue,
+      issue: match[2],
       tipo,
-      seq,
+      seq: Number(match[3]),
+      actor: cleanName(match[4]),
       responsable,
       cargo,
       date,
-      index: match.index || 0,
+      index: start,
       timestamp: movementTimestamp(date),
     })
   }
@@ -268,10 +294,10 @@ function pickLatestMovement(events) {
   return events.reduce((best, event) => (isNewerMovement(event, best) ? event : best), null)
 }
 
-// El responsable actual = actor del ultimo bloque de Reasignacion (los otros tipos
+// El responsable actual = destinatario del ultimo bloque de Reasignacion (los otros tipos
 // -Archivado, Respuesta, etc.- no cambian a quien esta asignado el tramite).
 function pickLatestOwner(events) {
-  return pickLatestMovement(events.filter((event) => OWNER_TYPES.has(event.tipo)))
+  return pickLatestMovement(events.filter((event) => OWNER_TYPES.has(event.tipo) && event.responsable))
 }
 
 function formatMovement(event, rootIssue) {
@@ -279,7 +305,7 @@ function formatMovement(event, rootIssue) {
   const prefix = event.issue && event.issue !== rootIssue ? `Trámite ${event.issue}: ` : ''
   const seq = event.seq ? ` (#${event.seq})` : ''
   const date = event.date ? `${event.date} - ` : ''
-  const label = OWNER_TYPES.has(event.tipo) ? `${event.tipo} a ${event.responsable}` : event.tipo
+  const label = OWNER_TYPES.has(event.tipo) && event.responsable ? `${event.tipo} a ${event.responsable}` : event.tipo
   return `${prefix}${date}${label}${seq}`
 }
 
