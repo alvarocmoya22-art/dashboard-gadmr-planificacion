@@ -477,7 +477,12 @@ function describePage(issue, html, url) {
     hijos: parsed.tramites_hijos,
     textLen: text.length,
     movimientos: movements.map((m) => ({ tipo: m.tipo, date: m.date, seq: m.seq, index: m.index, responsable: m.responsable })),
-    // Texto completo del flujo real, para reconstruir la gramatica de los bloques de movimiento.
+    // Señales para detectar paginacion / cobertura del flujo.
+    textLenTotal: text.length,
+    numeroMovimientoMax: Math.max(0, ...[...text.matchAll(/#(\d{1,4})(?!\d)/g)].map((mm) => Number(mm[1]))),
+    hayPaginacion: /Siguiente|P[aá]gina|›|»|data-page|paginate/i.test(html),
+    ultimos3000: text.slice(-3000).replace(/\n/g, ' ⏎ '),
+    // Texto del flujo real, para reconstruir la gramatica de los bloques de movimiento.
     flujo: (() => {
       const i = text.search(/Flujo de procesos/i)
       return i < 0 ? '(no aparece)' : text.slice(i, i + 14000).replace(/\n/g, ' ⏎ ')

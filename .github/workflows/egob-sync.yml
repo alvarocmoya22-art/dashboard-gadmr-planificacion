@@ -12,6 +12,12 @@ on:
 permissions:
   contents: read
 
+# Evita dos sincronizaciones en paralelo (manual + programada): la nueva espera a que
+# termine la anterior en vez de correr al mismo tiempo y competir por eGob/Supabase.
+concurrency:
+  group: egob-sync
+  cancel-in-progress: false
+
 jobs:
   sync:
     runs-on: ubuntu-latest
