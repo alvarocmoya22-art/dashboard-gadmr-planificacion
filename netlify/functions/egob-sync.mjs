@@ -512,35 +512,40 @@ export async function diagnoseRaw(issue) {
   }
 }
 
-// eGob es Redmine: prueba la API JSON, que da el asignado actual y todos los journals sin paginar.
+// eGob es Redmine: prueba varias vias para obtener el historial completo (sin paginacion HTML).
 export async function diagnoseJson(issue) {
   const { jar, page } = await openSession(issue)
   const key = page.html.match(/[?&]key=([a-f0-9]{20,})/i)?.[1] || ''
+  const k = key ? `key=${key}` : ''
   const results = { issue, keyFound: Boolean(key) }
-  const jsonUrl = `${EGOB_BASE_URL}/issues/${issue}.json?include=journals${key ? `&key=${key}` : ''}`
-  const jr = await follow(jar, jsonUrl)
-  results.jsonStatus = jr.response.status
-  results.finalUrl = jr.url.replace(key, 'KEY')
-  try {
-    const data = JSON.parse(jr.html)
-    const it = data.issue || {}
-    results.assigned_to = it.assigned_to || null
-    results.author = it.author || null
-    results.status = it.status || null
-    results.priority = it.priority || null
-    results.updated_on = it.updated_on
-    const journals = it.journals || []
-    results.journalCount = journals.length
-    results.assignedChanges = journals
-      .flatMap((j) => (j.details || [])
-        .filter((d) => d.name === 'assigned_to_id')
-        .map((d) => ({ on: j.created_on, by: j.user?.name, old: d.old_value, new: d.new_value })))
-      .slice(-6)
-    results.lastJournals = journals.slice(-4).map((j) => ({ on: j.created_on, by: j.user?.name, notes: (j.notes || '').slice(0, 90), details: j.details }))
-  } catch (error) {
-    results.parseError = String(error.message).slice(0, 120)
-    results.bodySample = jr.html.slice(0, 400)
+
+  const tryUrl = async (label, path) => {
+    try {
+      const r = await follow(jar, `${EGOB_BASE_URL}${path}`)
+      const ct = r.response.headers.get('content-type') || ''
+      results[label] = {
+        status: r.response.status,
+        contentType: ct.slice(0, 60),
+        len: r.html.length,
+        // muestra util: para atom, las entradas; para json, el inicio
+        sample: r.html.replace(/\s+/g, ' ').slice(0, 500),
+      }
+      return r
+    } catch (error) {
+      results[label] = { error: String(error.message).slice(0, 120) }
+      return null
+    }
   }
+
+  await tryUrl('json_plain', `/issues/${issue}.json?${k}`)
+  await tryUrl('atom', `/issues/${issue}.atom?${k}`)
+  const rec = await tryUrl('recorrido_pdf', `/issues/${issue}/download_recorrido_pdf?${k}`)
+  if (rec) results.recorrido_pdf.isPdf = rec.html.slice(0, 5).includes('%PDF')
+
+  // Busca en el HTML de la pagina el endpoint que carga mas movimientos (journals/flujo).
+  results.htmlEndpoints = [...page.html.matchAll(/["'](\/issues\/\d+\/[a-z_]+|\/journals?\/[^"']+|[^"']*(?:journal|flujo|recorrido|timeline)[^"']*)["']/gi)]
+    .map((m) => m[1]).filter((v, i, a) => a.indexOf(v) === i).slice(0, 30)
+
   return results
 }
 
