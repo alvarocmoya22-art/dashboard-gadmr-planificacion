@@ -7,3 +7,10 @@ dist
 
 # Local Netlify folder
 .netlify
+
+# Logs de diagnóstico/sincronización eGob (datos internos, no versionar)
+egob-*.log
+vite-*.log
+*.out.log
+*.err.log
+_tmp_*

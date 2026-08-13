@@ -512,6 +512,38 @@ export async function diagnoseRaw(issue) {
   }
 }
 
+// eGob es Redmine: prueba la API JSON, que da el asignado actual y todos los journals sin paginar.
+export async function diagnoseJson(issue) {
+  const { jar, page } = await openSession(issue)
+  const key = page.html.match(/[?&]key=([a-f0-9]{20,})/i)?.[1] || ''
+  const results = { issue, keyFound: Boolean(key) }
+  const jsonUrl = `${EGOB_BASE_URL}/issues/${issue}.json?include=journals${key ? `&key=${key}` : ''}`
+  const jr = await follow(jar, jsonUrl)
+  results.jsonStatus = jr.response.status
+  results.finalUrl = jr.url.replace(key, 'KEY')
+  try {
+    const data = JSON.parse(jr.html)
+    const it = data.issue || {}
+    results.assigned_to = it.assigned_to || null
+    results.author = it.author || null
+    results.status = it.status || null
+    results.priority = it.priority || null
+    results.updated_on = it.updated_on
+    const journals = it.journals || []
+    results.journalCount = journals.length
+    results.assignedChanges = journals
+      .flatMap((j) => (j.details || [])
+        .filter((d) => d.name === 'assigned_to_id')
+        .map((d) => ({ on: j.created_on, by: j.user?.name, old: d.old_value, new: d.new_value })))
+      .slice(-6)
+    results.lastJournals = journals.slice(-4).map((j) => ({ on: j.created_on, by: j.user?.name, notes: (j.notes || '').slice(0, 90), details: j.details }))
+  } catch (error) {
+    results.parseError = String(error.message).slice(0, 120)
+    results.bodySample = jr.html.slice(0, 400)
+  }
+  return results
+}
+
 export async function diagnoseIssue(issue) {
   const { jar, page } = await openSession(issue)
   const rootDesc = describePage(issue, page.html, page.url)
