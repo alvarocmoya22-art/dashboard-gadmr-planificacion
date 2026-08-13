@@ -7,6 +7,10 @@ on:
         description: 'Números eGob separados por coma (ej: 914830,295460,1155221)'
         required: true
         default: '914830'
+      mode:
+        description: 'full (parseo) o raw (pistas del HTML crudo)'
+        required: false
+        default: 'full'
 
 permissions:
   contents: read
@@ -38,6 +42,7 @@ jobs:
         run: node scripts/egob-diagnose.mjs
         env:
           DIAG_ISSUES: ${{ inputs.issues }}
+          DIAG_MODE: ${{ inputs.mode }}
           EGOB_USERNAME: ${{ secrets.EGOB_USERNAME }}
           EGOB_PASSWORD: ${{ secrets.EGOB_PASSWORD }}
           EGOB_BASE_URL: ${{ secrets.EGOB_BASE_URL }}

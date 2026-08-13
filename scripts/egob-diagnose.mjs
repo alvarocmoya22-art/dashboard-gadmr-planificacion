@@ -1,4 +1,6 @@
-import { diagnoseIssue } from '../netlify/functions/egob-sync.mjs'
+import { diagnoseIssue, diagnoseRaw } from '../netlify/functions/egob-sync.mjs'
+
+const MODE = process.env.DIAG_MODE || 'full'
 
 const issues = String(process.env.DIAG_ISSUES || '')
   .split(/[\s,]+/)
@@ -11,9 +13,9 @@ if (!issues.length) {
 }
 
 for (const issue of issues) {
-  console.log(`\n\n############### DIAGNÓSTICO eGob ${issue} ###############`)
+  console.log(`\n\n############### DIAGNÓSTICO eGob ${issue} (modo ${MODE}) ###############`)
   try {
-    const result = await diagnoseIssue(issue)
+    const result = MODE === 'raw' ? await diagnoseRaw(issue) : await diagnoseIssue(issue)
     console.log(JSON.stringify(result, null, 2))
   } catch (error) {
     console.error(`ERROR ${issue}:`, error?.message || error)

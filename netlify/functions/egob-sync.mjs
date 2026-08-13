@@ -490,6 +490,28 @@ function describePage(issue, html, url) {
   }
 }
 
+// Diagnostico RAW: vuelca pistas del HTML crudo para encontrar el endpoint AJAX
+// que carga los movimientos recientes del flujo (eGob los trae por JavaScript).
+export async function diagnoseRaw(issue) {
+  const { page } = await openSession(issue)
+  const html = page.html
+  const grab = (re, n = 20, len = 220) => {
+    const out = []
+    for (const m of html.matchAll(re)) { out.push(m[0].replace(/\s+/g, ' ').slice(0, len)); if (out.length >= n) break }
+    return [...new Set(out)]
+  }
+  return {
+    issue,
+    htmlLen: html.length,
+    scriptsSrc: grab(/<script[^>]*\bsrc=["'][^"']+["']/gi),
+    dataUrls: grab(/data-[a-z-]*url=["'][^"']+["']/gi),
+    dataAttrs: grab(/data-(remote|method|type|params|issue|id|page|offset|flujo|journal)=["'][^"']*["']/gi),
+    ajaxCalls: grab(/(?:url\s*:\s*["'`]|fetch\(\s*["'`]|\.load\(\s*["'`]|\$\.(?:get|post|ajax)\(\s*[{("'`])[^"'`;)\n]{0,180}/gi, 40),
+    issueRefs: grab(new RegExp(`["'/][a-z_/.]*${issue}[a-z0-9_/.?=&#-]*`, 'gi'), 30),
+    flujoKeywords: grab(/(flujo|journals?|movimiento|timeline|historial|cargar|load[_-]?more|siguiente|paginat|per_page|page=)[^<>"'\n]{0,120}/gi, 40),
+  }
+}
+
 export async function diagnoseIssue(issue) {
   const { jar, page } = await openSession(issue)
   const rootDesc = describePage(issue, page.html, page.url)
