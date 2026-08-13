@@ -70,11 +70,12 @@ function nodeRequest(url, options = {}) {
       const chunks = []
       res.on('data', (chunk) => chunks.push(chunk))
       res.on('end', () => {
-        const text = Buffer.concat(chunks).toString('utf8')
+        const buffer = Buffer.concat(chunks)
         resolve({
           status: res.statusCode || 0,
           headers: { get: (name) => res.headers[name.toLowerCase()]?.toString() || null },
-          text: async () => text,
+          text: async () => buffer.toString('utf8'),
+          buffer,
         })
       })
     })
@@ -94,6 +95,19 @@ async function follow(jar, url, options = {}) {
     response = await request(jar, currentUrl)
   }
   return { response, url: currentUrl, html: await response.text() }
+}
+
+// Descarga binaria (para el PDF de recorrido), siguiendo redirecciones.
+async function followBinary(jar, url) {
+  let currentUrl = url
+  let response = await request(jar, currentUrl)
+  for (let i = 0; i < 10 && response.status >= 300 && response.status < 400; i += 1) {
+    const location = response.headers.get('location')
+    if (!location) break
+    currentUrl = absoluteUrl(location, currentUrl)
+    response = await request(jar, currentUrl)
+  }
+  return { response, url: currentUrl, buffer: response.buffer }
 }
 
 function inputValue(html, name) {
@@ -547,6 +561,42 @@ export async function diagnoseJson(issue) {
     .map((m) => m[1]).filter((v, i, a) => a.indexOf(v) === i).slice(0, 30)
 
   return results
+}
+
+// Obtiene el texto del PDF de "recorrido" (historial COMPLETO del tramite, sin paginacion).
+async function fetchRecorridoText(jar, issue, key) {
+  const url = `${EGOB_BASE_URL}/issues/${encodeURIComponent(issue)}/download_recorrido_pdf${key ? `?key=${key}` : ''}`
+  const { response, buffer } = await followBinary(jar, url)
+  if (response.status !== 200 || !buffer || !buffer.slice(0, 5).toString('latin1').includes('%PDF')) return ''
+  const { PDFParse } = await import('pdf-parse')
+  const parser = new PDFParse({ data: buffer })
+  const result = await parser.getText()
+  return repairMojibake(result?.text || '')
+}
+
+function apiKeyFrom(html) {
+  return html.match(/[?&]key=([a-f0-9]{20,})/i)?.[1] || ''
+}
+
+export async function diagnosePdf(issue) {
+  const { jar, page } = await openSession(issue)
+  const key = apiKeyFrom(page.html)
+  const out = { issue, keyFound: Boolean(key) }
+  try {
+    const text = await fetchRecorridoText(jar, issue, key)
+    out.textLen = text.length
+    const movs = extractMovements(String(issue), text)
+    out.movimientos = movs.length
+    out.numeroMovimientoMax = Math.max(0, ...[...text.matchAll(/#(\d{1,4})(?!\d)/g)].map((m) => Number(m[1])))
+    const owner = pickLatestOwner(movs)
+    out.responsable = owner?.responsable
+    out.ultimo = formatMovement(pickLatestMovement(movs), String(issue))
+    out.textHead = text.slice(0, 3500).replace(/\n/g, ' ⏎ ')
+    out.textTail = text.slice(-3500).replace(/\n/g, ' ⏎ ')
+  } catch (error) {
+    out.error = String(error?.message || error).slice(0, 200)
+  }
+  return out
 }
 
 export async function diagnoseIssue(issue) {

@@ -1,4 +1,4 @@
-import { diagnoseIssue, diagnoseRaw, diagnoseJson } from '../netlify/functions/egob-sync.mjs'
+import { diagnoseIssue, diagnoseRaw, diagnoseJson, diagnosePdf } from '../netlify/functions/egob-sync.mjs'
 
 const MODE = process.env.DIAG_MODE || 'full'
 
@@ -17,6 +17,7 @@ for (const issue of issues) {
   try {
     const result = MODE === 'raw' ? await diagnoseRaw(issue)
       : MODE === 'json' ? await diagnoseJson(issue)
+      : MODE === 'pdf' ? await diagnosePdf(issue)
       : await diagnoseIssue(issue)
     console.log(JSON.stringify(result, null, 2))
   } catch (error) {
