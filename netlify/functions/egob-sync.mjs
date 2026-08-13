@@ -186,65 +186,41 @@ function parseLatestAttachment(text) {
 }
 
 // ---------------------------------------------------------------------------
-// Motor de movimientos.
-// Un movimiento eGob se compone de: actor (encabezado, NO es el responsable),
-// numero de secuencia (#189), fecha-hora y un cuerpo con la accion realizada.
-// El responsable actual siempre es el DESTINATARIO indicado en el cuerpo,
-// nunca el actor del encabezado.
+// Motor de movimientos (basado en la estructura REAL del "Flujo de procesos" de eGob).
+//
+// Cada movimiento se renderiza como un bloque con este encabezado:
+//
+//   Reasignación ( 1213382 ) #3  MARIA ALEJANDRA BONIFAZ LÓPEZ (Jefe de ...)  2026-07-27 17:45
+//   └─ tipo       └─ tramite   └seq └─ ACTOR = persona a quien queda asignado   └─ fecha-hora
+//
+// En eGob el ACTOR del encabezado es la persona a la que quedó asignado el tramite
+// (el destinatario/holder), y la fecha y el # estan DENTRO del encabezado.
+// Por lo tanto: responsable actual = actor del bloque de Reasignacion con la fecha
+// mas reciente de toda la cadena (madre + hijos). No se usan heuristicas de texto libre
+// (que capturaban el menu lateral o el usuario logueado).
 // ---------------------------------------------------------------------------
 
-const MOVEMENT_MATCHERS = [
-  {
-    tipo: 'Reasignación',
-    // "Asignado ha cambiado de PERSONA A a PERSONA B" -> destinatario = PERSONA B
-    regex: /Asignado\s+ha\s+cambiado\s+de\s+.+?\s+a\s+([^\n<]+)/gi,
-    destino: (m) => cleanName(m[1]),
-    label: (name) => `Reasignación a ${name}`,
-  },
-  {
-    tipo: 'Reasignación',
-    // "Reasignación a PERSONA" / "Reasignado/s a PERSONA"
-    regex: /Reasignaci[oó]?n\s+a:?\s+([^\n<]+)/gi,
-    destino: (m) => cleanName(m[1]),
-    label: (name) => `Reasignación a ${name}`,
-  },
-  {
-    tipo: 'Reasignación',
-    regex: /Reasignad[oa]s?\s+a:?\s+([^\n<]+)/gi,
-    destino: (m) => cleanName(m[1]),
-    label: (name) => `Reasignación a ${name}`,
-  },
-  {
-    tipo: 'Documento enviado',
-    // "Documento enviado a PERSONA" (case-insensitive)
-    regex: /Documento\s+enviado\s+a\s+([^\n<]+)/gi,
-    destino: (m) => cleanName(m[1]),
-    label: (name) => `Documento enviado a ${name}`,
-  },
-  {
-    tipo: 'Nueva respuesta',
-    regex: /Nueva\s+respuesta/gi,
-    destino: () => '',
-    label: () => 'Nueva respuesta',
-  },
-  {
-    tipo: 'Archivado',
-    regex: /\bArchivad[oa]\b/gi,
-    destino: () => '',
-    label: () => 'Archivado',
-  },
-]
+// Tipos de bloque conocidos en el flujo eGob.
+const MOVEMENT_TYPES = 'Reasignación|Reasignacion|Documento Enviado|Documento enviado|Nueva Respuesta|Nueva respuesta|Archivado|Archivada|Anulación|Anulacion|Anulado|Delegación|Delegacion|Delegado|Sumillado|Respuesta'
 
-// Busca fecha-hora y numero de secuencia mas cercanos al anclaje de la accion.
-function contextMetadata(text, anchorIndex) {
-  const before = text.slice(Math.max(0, anchorIndex - 600), anchorIndex)
-  const after = text.slice(anchorIndex, Math.min(text.length, anchorIndex + 200))
-  const dates = [...`${before}\n${after}`.matchAll(DATE_TIME_RE)].map((item) => item[0])
-  const date = (dates.at(-1) || '').replace(/\s+/g, ' ').trim()
-  // #189: secuencia del movimiento (1 a 4 digitos). Excluye numeros de tramite (5+ digitos).
-  const seqMatches = [...before.matchAll(/#(\d{1,4})(?!\d)/g)].map((item) => Number(item[1]))
-  const seq = seqMatches.length ? seqMatches.at(-1) : null
-  return { date, seq }
+// Encabezado de bloque: TIPO ( tramite ) #seq  ACTOR (cargo opcional)  FECHA HORA
+const HEADER_RE = new RegExp(
+  `(${MOVEMENT_TYPES})\\s*\\(\\s*(\\d{4,})\\s*\\)\\s*#(\\d+)\\s+` +
+  `([${NAME_CHARS}][^\\n(]{3,70}?)\\s*(?:\\(([^)\\n]{0,160})\\))?\\s*` +
+  `(\\d{4}-\\d{2}-\\d{2}\\s+\\d{2}:\\d{2})`,
+  'g',
+)
+
+// Solo estos tipos definen quien tiene el tramite (su actor es el nuevo responsable/holder).
+const OWNER_TYPES = new Set(['Reasignación'])
+
+function normalizeTipo(tipo) {
+  return tipo.replace('Reasignacion', 'Reasignación')
+    .replace('Documento enviado', 'Documento Enviado')
+    .replace('Nueva respuesta', 'Nueva Respuesta')
+    .replace('Archivada', 'Archivado')
+    .replace('Anulacion', 'Anulación')
+    .replace('Delegacion', 'Delegación')
 }
 
 function movementTimestamp(date) {
@@ -255,30 +231,27 @@ function movementTimestamp(date) {
   return dayOnly ? new Date(`${dayOnly[1]}T23:59`).getTime() : 0
 }
 
-// Extrae todos los movimientos de un texto plano (una pagina eGob ya aplanada).
-function extractMovements(issue, text) {
+// Extrae todos los bloques de movimiento del texto plano de una pagina eGob.
+function extractMovements(_issue, text) {
   const events = []
-  for (const matcher of MOVEMENT_MATCHERS) {
-    matcher.regex.lastIndex = 0
-    for (const match of text.matchAll(matcher.regex)) {
-      const anchor = match.index || 0
-      const responsable = matcher.destino(match)
-      // Las reasignaciones y envios exigen un destinatario valido.
-      if (matcher.tipo === 'Reasignación' || matcher.tipo === 'Documento enviado') {
-        if (!responsable) continue
-      }
-      const { date, seq } = contextMetadata(text, anchor)
-      events.push({
-        issue,
-        tipo: matcher.tipo,
-        responsable,
-        date,
-        seq,
-        index: anchor,
-        timestamp: movementTimestamp(date),
-        label: matcher.label(responsable),
-      })
-    }
+  for (const match of text.matchAll(HEADER_RE)) {
+    const tipo = normalizeTipo(match[1])
+    const blockIssue = match[2]
+    const seq = Number(match[3])
+    const responsable = cleanName(match[4])
+    const cargo = repairMojibake(match[5] || '').replace(/\s+/g, ' ').trim()
+    const date = match[6].replace(/\s+/g, ' ').trim()
+    if (!responsable) continue
+    events.push({
+      issue: blockIssue,
+      tipo,
+      seq,
+      responsable,
+      cargo,
+      date,
+      index: match.index || 0,
+      timestamp: movementTimestamp(date),
+    })
   }
   return events
 }
@@ -287,9 +260,7 @@ function extractMovements(issue, text) {
 function isNewerMovement(candidate, current) {
   if (!current) return true
   if (candidate.timestamp !== current.timestamp) return candidate.timestamp > current.timestamp
-  const candidateSeq = candidate.seq ?? -1
-  const currentSeq = current.seq ?? -1
-  if (candidateSeq !== currentSeq) return candidateSeq > currentSeq
+  if (candidate.seq !== current.seq) return candidate.seq > current.seq
   return candidate.index >= current.index
 }
 
@@ -297,11 +268,10 @@ function pickLatestMovement(events) {
   return events.reduce((best, event) => (isNewerMovement(event, best) ? event : best), null)
 }
 
-// El responsable actual es el destinatario del ultimo movimiento que asigna a alguien
-// (reasignacion o documento enviado). "Nueva respuesta"/"Archivado" no cambian el responsable.
+// El responsable actual = actor del ultimo bloque de Reasignacion (los otros tipos
+// -Archivado, Respuesta, etc.- no cambian a quien esta asignado el tramite).
 function pickLatestOwner(events) {
-  const withOwner = events.filter((event) => event.responsable)
-  return pickLatestMovement(withOwner)
+  return pickLatestMovement(events.filter((event) => OWNER_TYPES.has(event.tipo)))
 }
 
 function formatMovement(event, rootIssue) {
@@ -309,7 +279,8 @@ function formatMovement(event, rootIssue) {
   const prefix = event.issue && event.issue !== rootIssue ? `Trámite ${event.issue}: ` : ''
   const seq = event.seq ? ` (#${event.seq})` : ''
   const date = event.date ? `${event.date} - ` : ''
-  return `${prefix}${date}${event.label}${seq}`
+  const label = OWNER_TYPES.has(event.tipo) ? `${event.tipo} a ${event.responsable}` : event.tipo
+  return `${prefix}${date}${label}${seq}`
 }
 
 function parseIssue(issue, html, finalUrl) {
@@ -340,7 +311,7 @@ function parseIssue(issue, html, finalUrl) {
     estado: estado || latestMovement?.tipo || '',
     prioridad,
     responsable_actual: responsable,
-    responsable_cargo: parseRoleForAssignee(text, responsable),
+    responsable_cargo: latestOwner?.cargo || parseRoleForAssignee(text, responsable),
     ultimo_movimiento: ultimoMovimiento,
     actualizado_en: actualizado,
     // timestamp/seq del movimiento seleccionado, para comparar entre madre e hijos.
@@ -361,8 +332,7 @@ function mergeIssueChain(rootIssue, relatedIssues) {
   const allOwners = candidates.flatMap((item) => (item._owner ? [item._owner] : []))
   const latestOwner = pickLatestOwner(allOwners)
 
-  // El estado/cargo se toma del tramite donde ocurrio el ultimo movimiento con responsable.
-  const ownerIssue = candidates.find((item) => item.issue === latestOwner?.issue) || rootIssue
+  // El estado se toma del tramite donde ocurrio el ultimo movimiento; el cargo, del bloque owner.
   const movementIssue = candidates.find((item) => item.issue === latestMovement?.issue) || rootIssue
 
   return {
@@ -372,7 +342,7 @@ function mergeIssueChain(rootIssue, relatedIssues) {
     estado: movementIssue.estado || rootIssue.estado,
     prioridad: rootIssue.prioridad,
     responsable_actual: latestOwner?.responsable || rootIssue.responsable_actual,
-    responsable_cargo: ownerIssue.responsable_cargo || rootIssue.responsable_cargo,
+    responsable_cargo: latestOwner?.cargo || rootIssue.responsable_cargo,
     ultimo_movimiento: formatMovement(latestMovement, rootIssue.issue) || rootIssue.ultimo_movimiento,
     actualizado_en: movementIssue.actualizado_en || rootIssue.actualizado_en,
     tramites_hijos: [...new Set(candidates.flatMap((item) => item.tramites_hijos || []).filter((item) => item !== rootIssue.issue))],
@@ -382,10 +352,11 @@ function mergeIssueChain(rootIssue, relatedIssues) {
 }
 
 async function readRelatedIssues(jar, rootIssue, linkedIssues, visited = new Set([rootIssue])) {
+  const MAX_PAGES = 40
   const related = []
-  const queue = [...new Set(linkedIssues || [])].filter((item) => item && !visited.has(item)).slice(0, 12)
+  const queue = [...new Set(linkedIssues || [])].filter((item) => item && !visited.has(item))
 
-  while (queue.length) {
+  while (queue.length && visited.size <= MAX_PAGES) {
     const issue = queue.shift()
     if (!issue || visited.has(issue)) continue
     visited.add(issue)
@@ -397,7 +368,7 @@ async function readRelatedIssues(jar, rootIssue, linkedIssues, visited = new Set
     related.push(parsed)
 
     for (const child of parsed.tramites_hijos || []) {
-      if (!visited.has(child) && queue.length < 12) queue.push(child)
+      if (!visited.has(child) && !queue.includes(child) && visited.size + queue.length < MAX_PAGES) queue.push(child)
     }
   }
 
