@@ -655,28 +655,26 @@ function canonicalName(pdfName, roster) {
   return clean
 }
 
-// Separa el blob "DE PARA" de una reasignacion usando el roster (busca el sufijo que sea un nombre).
+// Separa el blob "DE PARA" de una reasignacion. El "Para" (nuevo responsable) es el
+// sufijo MÁS LARGO que sea un nombre completo conocido (evita truncar apellidos).
 function splitDePara(blob, roster, singleNames) {
   const words = blob.split(' ')
-  // Prueba cortes: la segunda mitad (Para) debe ser un nombre conocido (roster o nombres sueltos).
-  const isKnown = (arr) => {
+  const n = words.length
+  const isKnownName = (arr) => {
+    const joined = arr.join(' ')
+    if (singleNames.has(joined)) return true
     const key = [...arr].sort().join(' ')
-    if (roster.has(key)) return true
-    return singleNames.has(arr.join(' '))
+    return roster.has(key)
   }
-  for (let i = Math.max(2, words.length - 5); i <= words.length - 2; i += 1) {
-    const de = words.slice(0, i)
-    const para = words.slice(i)
-    if (para.length >= 2 && para.length <= 5 && isKnown(para) && isKnown(de)) {
-      return { de: de.join(' '), para: para.join(' ') }
-    }
+  // Prefiere el sufijo mas largo (nombre completo) que aparezca como nombre conocido.
+  for (let paraLen = Math.min(5, n - 1); paraLen >= 2; paraLen -= 1) {
+    const para = words.slice(n - paraLen)
+    if (isKnownName(para)) return { de: words.slice(0, n - paraLen).join(' '), para: para.join(' ') }
   }
-  // Fallback: mitad y mitad (nombres de 4 palabras c/u es lo comun).
-  if (words.length >= 4 && words.length % 2 === 0) {
-    const h = words.length / 2
-    return { de: words.slice(0, h).join(' '), para: words.slice(h).join(' ') }
-  }
-  return { de: '', para: '' }
+  // Fallback sin roster: los nombres suelen ser de 4 palabras (2 apellidos + 2 nombres).
+  if (n >= 8 && n % 2 === 0) return { de: words.slice(0, n / 2).join(' '), para: words.slice(n / 2).join(' ') }
+  if (n >= 4) return { de: words.slice(0, n - 4).join(' '), para: words.slice(n - 4).join(' ') }
+  return { de: '', para: words.join(' ') }
 }
 
 function rutaTimestamp(date) {
