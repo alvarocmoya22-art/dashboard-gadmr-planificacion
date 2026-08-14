@@ -475,3 +475,38 @@ main { padding:30px 34px 48px;max-width:1600px;margin:auto; }
     padding:7px 9px;
   }
 }
+
+/* ---------- Vista operativa (operador) ---------- */
+.operativa { display:flex; flex-direction:column; gap:14px; }
+.operativa-search { display:flex; align-items:center; gap:9px; background:#fff; border:1px solid var(--line); border-radius:12px; padding:10px 14px; color:var(--muted); max-width:520px; }
+.operativa-search input { border:0; outline:0; background:transparent; font-size:13px; color:#17323a; width:100%; }
+.operativa-count { font-size:12px; font-weight:700; color:var(--muted); }
+.operativa-list { display:grid; grid-template-columns:repeat(auto-fill,minmax(340px,1fr)); gap:14px; }
+.operativa-card { padding:16px; display:flex; flex-direction:column; gap:13px; }
+.operativa-card-head { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+.operativa-card-head small { font-size:10px; font-weight:800; letter-spacing:.04em; color:var(--teal); text-transform:uppercase; }
+.operativa-card-head h3 { margin:3px 0 0; font-size:14px; line-height:1.3; color:var(--navy); }
+.operativa-card-grid { display:grid; grid-template-columns:1fr 1fr; gap:11px; }
+.operativa-card-grid > div { display:flex; flex-direction:column; gap:3px; min-width:0; }
+.operativa-card-grid span { display:inline-flex; align-items:center; gap:5px; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); }
+.operativa-card-grid strong { font-size:12px; font-weight:600; color:#17323a; word-break:break-word; }
+.operativa-card-grid small { font-size:11px; color:var(--muted); }
+.operativa-link { display:inline-flex; align-items:center; gap:6px; background:none; border:0; padding:0; font-size:12px; font-weight:700; color:var(--teal); cursor:pointer; text-align:left; word-break:break-word; }
+.operativa-link:hover { text-decoration:underline; }
+.operativa-card-actions { display:flex; flex-wrap:wrap; gap:9px; margin-top:2px; }
+.operativa-card-actions .button { flex:1; min-width:130px; }
+
+/* Panel de gestión operativa dentro del detalle */
+.operative-edit { padding:16px; display:flex; flex-direction:column; gap:12px; border:1px solid #cfe6df; background:linear-gradient(180deg,#f4fbf8,#ffffff); }
+.operative-edit h3 { display:flex; align-items:center; gap:8px; margin:0; font-size:14px; color:var(--navy); }
+.operative-edit-grid { display:grid; grid-template-columns:1fr 1fr; gap:11px; }
+.operative-edit-grid .span-2 { grid-column:span 2; }
+.operative-edit-review { grid-column:span 2; }
+
+@media (max-width:640px) {
+  .operativa-list { grid-template-columns:1fr; }
+  .operativa-card-grid { grid-template-columns:1fr; }
+  .operative-edit-grid { grid-template-columns:1fr; }
+  .operative-edit-grid .span-2, .operative-edit-review { grid-column:span 1; }
+  .operativa-card-actions .button { flex:1 1 100%; }
+}

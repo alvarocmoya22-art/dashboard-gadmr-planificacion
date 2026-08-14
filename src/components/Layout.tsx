@@ -1,16 +1,21 @@
 import { useMemo, useState, type ReactNode } from 'react'
 import { NavLink, useLocation, useNavigate } from 'react-router-dom'
-import { Bell, ChartNoAxesCombined, ChevronLeft, LayoutDashboard, LogOut, Menu, Search, Settings2, X } from 'lucide-react'
+import { Bell, ChartNoAxesCombined, ChevronLeft, LayoutDashboard, LogOut, Menu, Search, Settings2, Table2, X } from 'lucide-react'
 import { useApp } from '../store/AppContext'
 import { cn, formatDate, repairMojibake, todayIso } from '../lib/utils'
 import { supabase } from '../lib/supabase'
 
-const nav = [
+const managementNav = [
   { to: '/', label: 'Vista ejecutiva', icon: LayoutDashboard },
+]
+
+const operatorNav = [
+  { to: '/operativa', label: 'Vista operativa', icon: Table2 },
 ]
 
 const titles: Record<string, [string, string]> = {
   '/': ['Vista ejecutiva del Director', 'Resumen gerencial del portafolio, movimientos eGob, comentarios internos y próximos puntos de seguimiento.'],
+  '/operativa': ['Vista operativa', 'Revisa los trámites, deja comentarios internos, adjunta documentos y actualiza el avance.'],
   '/procesos': ['Gestión de trámites', 'Consulta, filtra y actualiza la matriz de trámites institucionales.'],
   '/kanban': ['Flujo institucional', 'Los trámites organizados por su estado actual.'],
   '/alertas': ['Atención requerida', 'Prioridades, retrasos y vacíos de gestión para resolver hoy.'],
@@ -25,8 +30,8 @@ export function Layout({ children }: { children: ReactNode }) {
   const [seenNotifications, setSeenNotifications] = useState(() => Number(localStorage.getItem('status-notifications-seen') || 0))
   const { pathname } = useLocation()
   const navigate = useNavigate()
-  const { demoMode, userName, role, globalSearch, setGlobalSearch, logs, processes, statuses } = useApp()
-  const visibleNav = nav
+  const { canAccessManagement, demoMode, userName, role, globalSearch, setGlobalSearch, logs, processes, statuses } = useApp()
+  const visibleNav = canAccessManagement ? managementNav : operatorNav
   const [title, description] = titles[pathname] ?? ['Detalle del trámite', 'Trazabilidad completa del trámite institucional.']
   const showGlobalSearch = pathname === '/procesos'
   const logoUrl = `${import.meta.env.BASE_URL}gadmr-logo.png`
