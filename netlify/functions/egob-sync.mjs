@@ -563,6 +563,107 @@ export async function diagnoseJson(issue) {
   return results
 }
 
+// --- Parser de la "Hoja de Ruta" (PDF de recorrido): historial completo y estructurado ---
+// Cada fila: ÁREA · FECHA · ACCIÓN · De · Para · No.días("Fecha límite …") · Comentario.
+// Los nombres vienen en orden APELLIDOS NOMBRES (al reves del dashboard) y fragmentados por lineas.
+
+const RUTA_ACCIONES = 'Reasignado|Adjunto|Archivado|Nueva respuesta|Documento enviado|Documento generado|Sumillado|Finalizado|Respondido|Respuesta|Anulado|Restaurado|Informado'
+
+function normalizeRuta(text) {
+  return repairMojibake(text)
+    .replace(/[\r\n\t]+/g, ' ')
+    // une fecha fragmentada "2026- 03-06 09:37" -> "2026-03-06 09:37"
+    .replace(/(\d{4})-\s+(\d{2})-(\d{2})\s+(\d{2}:\d{2})/g, '$1-$2-$3 $4')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+}
+
+// Extrae filas del recorrido: {date, accion, blob} donde blob = nombres (De [+ Para]).
+function parseHojaDeRuta(text) {
+  const t = normalizeRuta(text)
+  const re = new RegExp(
+    `(\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2})\\s+(${RUTA_ACCIONES})\\b\\s*` +
+    `([\\s\\S]*?)\\s*(?=Fecha\\s+l[ií]mite|\\d{4}-\\d{2}-\\d{2} \\d{2}:\\d{2}\\s+(?:${RUTA_ACCIONES})\\b|$)`,
+    'g',
+  )
+  const rows = []
+  for (const m of t.matchAll(re)) {
+    rows.push({ date: m[1], accion: m[2], blob: m[3].replace(/\s+/g, ' ').trim(), index: m.index || 0 })
+  }
+  return rows
+}
+
+// Construye un roster de nombres canonicos (orden NOMBRES APELLIDOS, como el dashboard)
+// a partir de las listas de usuarios del HTML de eGob (dos formatos disponibles).
+function buildNameRoster(pageHtml) {
+  const text = repairMojibake(stripText(pageHtml))
+  const canonical = new Map() // clave: palabras ordenadas alfabeticamente -> nombre canonico
+  const add = (name) => {
+    const clean = name.replace(/\s+/g, ' ').trim()
+    const words = clean.split(' ').filter((w) => /^[A-ZÁÉÍÓÚÑÜ][A-ZÁÉÍÓÚÑÜ.'-]+$/.test(w))
+    if (words.length < 2 || words.length > 6) return
+    const keySorted = [...words].sort().join(' ')
+    if (!canonical.has(keySorted)) canonical.set(keySorted, clean)
+  }
+  // Lista "Buscar usuarios de la Institución" (orden NOMBRES APELLIDOS, canonico).
+  const dest = text.match(/Buscar usuarios de la Instituci[oó]n\s+([\s\S]{0,4000}?)(?:Destinatarios externos|Con copia|A[ñn]adir destinatarios|-->)/i)?.[1] || ''
+  for (const m of dest.matchAll(/[A-ZÁÉÍÓÚÑÜ][A-ZÁÉÍÓÚÑÜ.'-]+(?:\s+[A-ZÁÉÍÓÚÑÜ][A-ZÁÉÍÓÚÑÜ.'-]+){1,5}/g)) add(m[0])
+  return canonical
+}
+
+// Reordena "APELLIDO APELLIDO NOMBRE NOMBRE" (PDF) al canonico "NOMBRE NOMBRE APELLIDO APELLIDO",
+// usando el roster por conjunto de palabras. Si no hay match, aplica swap de mitades (4 palabras).
+function canonicalName(pdfName, roster) {
+  const clean = repairMojibake(pdfName).replace(/\s+/g, ' ').trim()
+  if (!clean) return ''
+  const words = clean.split(' ')
+  const key = [...words].sort().join(' ')
+  if (roster.has(key)) return roster.get(key)
+  if (words.length === 4) return `${words[2]} ${words[3]} ${words[0]} ${words[1]}`
+  if (words.length === 3) return `${words[2]} ${words[0]} ${words[1]}`
+  return clean
+}
+
+// Separa el blob "DE PARA" de una reasignacion usando el roster (busca el sufijo que sea un nombre).
+function splitDePara(blob, roster, singleNames) {
+  const words = blob.split(' ')
+  // Prueba cortes: la segunda mitad (Para) debe ser un nombre conocido (roster o nombres sueltos).
+  const isKnown = (arr) => {
+    const key = [...arr].sort().join(' ')
+    if (roster.has(key)) return true
+    return singleNames.has(arr.join(' '))
+  }
+  for (let i = Math.max(2, words.length - 5); i <= words.length - 2; i += 1) {
+    const de = words.slice(0, i)
+    const para = words.slice(i)
+    if (para.length >= 2 && para.length <= 5 && isKnown(para) && isKnown(de)) {
+      return { de: de.join(' '), para: para.join(' ') }
+    }
+  }
+  // Fallback: mitad y mitad (nombres de 4 palabras c/u es lo comun).
+  if (words.length >= 4 && words.length % 2 === 0) {
+    const h = words.length / 2
+    return { de: words.slice(0, h).join(' '), para: words.slice(h).join(' ') }
+  }
+  return { de: '', para: '' }
+}
+
+// Resuelve el responsable actual a partir de las filas del recorrido: el "Para" del ultimo Reasignado.
+function resolveRecorrido(rows, roster) {
+  // Nombres sueltos (Adjunto/Archivado/etc.) = nombres validos sin ambiguedad -> ayudan a cortar De/Para.
+  const singleNames = new Set(
+    rows.filter((r) => r.accion !== 'Reasignado').map((r) => r.blob).filter((b) => b.split(' ').length >= 2 && b.split(' ').length <= 6),
+  )
+  const reasignaciones = []
+  for (const row of rows) {
+    if (row.accion !== 'Reasignado') continue
+    const { para } = splitDePara(row.blob, roster, singleNames)
+    if (para) reasignaciones.push({ date: row.date, para: canonicalName(para, roster), raw: para })
+  }
+  const last = reasignaciones.at(-1)
+  return { responsable: last?.para || '', date: last?.date || '', reasignaciones }
+}
+
 // Obtiene el texto del PDF de "recorrido" (historial COMPLETO del tramite, sin paginacion).
 async function fetchRecorridoText(jar, issue, key) {
   const url = `${EGOB_BASE_URL}/issues/${encodeURIComponent(issue)}/download_recorrido_pdf${key ? `?key=${key}` : ''}`
@@ -583,20 +684,18 @@ export async function diagnosePdf(issue) {
   const key = apiKeyFrom(page.html)
   const out = { issue, keyFound: Boolean(key) }
   try {
-    const url = `${EGOB_BASE_URL}/issues/${encodeURIComponent(issue)}/download_recorrido_pdf${key ? `?key=${key}` : ''}`
-    const { response, buffer } = await followBinary(jar, url)
-    out.pdfStatus = response.status
-    out.pdfBytes = buffer?.length || 0
-    const { PDFParse } = await import('pdf-parse')
-    const parser = new PDFParse({ data: buffer })
-    const table = await parser.getTable()
-    // Estructura de getTable: pages[].tables[].rows[] (cada row = array de celdas)
-    const pages = table?.pages || []
-    const rows = pages.flatMap((p) => (p.tables || []).flatMap((t) => t.rows || t || []))
-    out.tablePages = pages.length
-    out.tableRowCount = rows.length
-    out.tableSample = rows.slice(0, 4).map((r) => (Array.isArray(r) ? r.map((c) => String(c).replace(/\s+/g, ' ').slice(0, 30)) : String(r).slice(0, 120)))
-    out.tableTail = rows.slice(-6).map((r) => (Array.isArray(r) ? r.map((c) => String(c).replace(/\s+/g, ' ').slice(0, 30)) : String(r).slice(0, 120)))
+    const text = await fetchRecorridoText(jar, issue, key)
+    const roster = buildNameRoster(page.html)
+    const rows = parseHojaDeRuta(text)
+    const resolved = resolveRecorrido(rows, roster)
+    out.textLen = text.length
+    out.rosterSize = roster.size
+    out.filas = rows.length
+    out.reasignaciones = resolved.reasignaciones.length
+    out.RESPONSABLE = resolved.responsable
+    out.fecha = resolved.date
+    out.ultimas6Filas = rows.slice(-6).map((r) => `${r.date} · ${r.accion} · ${r.blob.slice(0, 60)}`)
+    out.ultimasReasignaciones = resolved.reasignaciones.slice(-5)
   } catch (error) {
     out.error = String(error?.message || error).slice(0, 200)
   }
