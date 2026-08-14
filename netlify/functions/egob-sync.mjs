@@ -780,6 +780,7 @@ export async function diagnosePdf(issue) {
     out.fecha = resolved.date
     out.ultimas6Filas = rows.slice(-6).map((r) => `${r.date} · ${r.accion} · ${r.blob.slice(0, 60)}`)
     out.ultimasReasignaciones = resolved.reasignaciones.slice(-5)
+    out.blobsReasignadoCrudos = rows.filter((r) => r.accion === 'Reasignado').slice(-4).map((r) => `${r.date} | ${r.blob}`)
   } catch (error) {
     out.error = String(error?.message || error).slice(0, 200)
   }
