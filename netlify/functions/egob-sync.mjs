@@ -472,9 +472,40 @@ async function openSession(issue) {
 
 export async function loginAndReadIssue(issue) {
   const { jar, page } = await openSession(issue)
-  const rootIssue = parseIssue(issue, page.html, page.url)
-  const relatedIssues = await readRelatedIssues(jar, issue, rootIssue.tramites_hijos)
-  return mergeIssueChain(rootIssue, relatedIssues)
+  const base = parseIssue(issue, page.html, page.url)
+
+  // Fuente primaria: PDF "Hoja de Ruta" (historial COMPLETO de toda la cadena, sin paginacion).
+  try {
+    const key = apiKeyFrom(page.html)
+    const text = await fetchRecorridoText(jar, issue, key)
+    const rows = text ? parseHojaDeRuta(text) : []
+    if (rows.length) {
+      const roster = buildNameRoster(page.html)
+      const rec = resolveRecorrido(rows, roster)
+      if (rec.responsable) {
+        return {
+          issue,
+          url: base.url,
+          asunto: base.asunto,
+          estado: base.estado || rec.estado,
+          prioridad: base.prioridad,
+          responsable_actual: rec.responsable,
+          responsable_cargo: parseRoleForAssignee(stripText(page.html), rec.responsable) || base.responsable_cargo,
+          ultimo_movimiento: rec.ultimo_movimiento || base.ultimo_movimiento,
+          actualizado_en: rec.actualizado_en || base.actualizado_en,
+          tramites_hijos: base.tramites_hijos,
+          tramites_revisados: [issue],
+          fuente: 'recorrido_pdf',
+          sincronizado_en: new Date().toISOString(),
+        }
+      }
+    }
+  } catch {
+    // Si el PDF falla, usa el metodo HTML (cadena madre/hijos) mas abajo.
+  }
+
+  const relatedIssues = await readRelatedIssues(jar, issue, base.tramites_hijos)
+  return mergeIssueChain(base, relatedIssues)
 }
 
 // Diagnostico: devuelve la estructura REAL de eGob (texto aplanado + movimientos extraidos)
@@ -648,20 +679,58 @@ function splitDePara(blob, roster, singleNames) {
   return { de: '', para: '' }
 }
 
-// Resuelve el responsable actual a partir de las filas del recorrido: el "Para" del ultimo Reasignado.
+function rutaTimestamp(date) {
+  const m = String(date).match(/(\d{4}-\d{2}-\d{2}) (\d{2}:\d{2})/)
+  return m ? new Date(`${m[1]}T${m[2]}`).getTime() : 0
+}
+
+const ACCION_LABEL = {
+  Reasignado: 'Reasignación',
+  Adjunto: 'Adjunto',
+  Archivado: 'Archivado',
+  'Nueva respuesta': 'Nueva respuesta',
+  'Documento enviado': 'Documento enviado',
+  'Documento generado': 'Documento generado',
+  Sumillado: 'Sumillado',
+  Finalizado: 'Finalizado',
+  Respondido: 'Respuesta',
+  Respuesta: 'Respuesta',
+  Anulado: 'Anulado',
+  Restaurado: 'Restaurado',
+  Informado: 'Informado',
+}
+
+// Resuelve responsable y ultimo movimiento a partir de las filas del recorrido (Hoja de Ruta).
+// Responsable = "Para" de la ultima Reasignacion por fecha; ultimo movimiento = ultima fila por fecha.
 function resolveRecorrido(rows, roster) {
   // Nombres sueltos (Adjunto/Archivado/etc.) = nombres validos sin ambiguedad -> ayudan a cortar De/Para.
   const singleNames = new Set(
     rows.filter((r) => r.accion !== 'Reasignado').map((r) => r.blob).filter((b) => b.split(' ').length >= 2 && b.split(' ').length <= 6),
   )
-  const reasignaciones = []
-  for (const row of rows) {
-    if (row.accion !== 'Reasignado') continue
-    const { para } = splitDePara(row.blob, roster, singleNames)
-    if (para) reasignaciones.push({ date: row.date, para: canonicalName(para, roster), raw: para })
+  const events = rows.map((row, i) => {
+    let para = ''
+    if (row.accion === 'Reasignado') {
+      const split = splitDePara(row.blob, roster, singleNames)
+      para = split.para ? canonicalName(split.para, roster) : ''
+    }
+    return { ...row, para, ts: rutaTimestamp(row.date), order: i }
+  })
+  const byDate = [...events].sort((a, b) => a.ts - b.ts || a.order - b.order)
+  const lastReassign = [...byDate].reverse().find((e) => e.accion === 'Reasignado' && e.para)
+  const lastRow = byDate.at(-1)
+  const formatRow = (e) => {
+    if (!e) return ''
+    const label = e.accion === 'Reasignado' && e.para ? `Reasignación a ${e.para}` : (ACCION_LABEL[e.accion] || e.accion)
+    return `${e.date} - ${label}`
   }
-  const last = reasignaciones.at(-1)
-  return { responsable: last?.para || '', date: last?.date || '', reasignaciones }
+  return {
+    responsable: lastReassign?.para || '',
+    date: lastReassign?.date || '',
+    estado: lastRow ? (ACCION_LABEL[lastRow.accion] || lastRow.accion) : '',
+    ultimo_movimiento: formatRow(lastRow),
+    actualizado_en: lastRow?.date || '',
+    reasignaciones: events.filter((e) => e.para).map((e) => ({ date: e.date, para: e.para })),
+  }
 }
 
 // Obtiene el texto del PDF de "recorrido" (historial COMPLETO del tramite, sin paginacion).
