@@ -3,7 +3,19 @@ import assert from 'node:assert/strict'
 import { __test__ } from '../netlify/functions/egob-sync.mjs'
 import { computeEgobUpdate } from '../netlify/functions/egob-sync-all.mjs'
 
-const { parseIssue, mergeIssueChain, extractMovements, stripText } = __test__
+const { parseIssue, mergeIssueChain, extractMovements, stripText, canonicalName } = __test__
+
+// --- Reordenamiento de nombres del PDF (apellidos primero -> nombres primero) ---------
+test('0. canonicalName reordena apellidos->nombres (incluye apellidos compuestos)', () => {
+  const cases = [
+    ['OLEAS BAQUERO CARLOS IGNACIO', 'CARLOS IGNACIO OLEAS BAQUERO'],
+    ['SUBIA ANDRADE NATALIA ELIZABETH', 'NATALIA ELIZABETH SUBIA ANDRADE'],
+    ['DEL POZO SIERRA LUIS ENRIQUE', 'LUIS ENRIQUE DEL POZO SIERRA'],
+    ['DE LA TORRE PONCE ANA MARIA', 'ANA MARIA DE LA TORRE PONCE'],
+    ['MAZON BONILLA MARISOL PAULINA', 'MARISOL PAULINA MAZON BONILLA'],
+  ]
+  for (const [input, expected] of cases) assert.equal(canonicalName(input, null), expected)
+})
 
 // --- Fixtures con la estructura REAL del "Flujo de procesos" de eGob ---------
 // Cada bloque: TIPO ( tramite ) #seq  ACTOR (cargo)  FECHA  Nota  "Asignado ha cambiado de ACTOR a DESTINO".

@@ -642,17 +642,34 @@ function buildNameRoster(pageHtml) {
   return canonical
 }
 
-// Reordena "APELLIDO APELLIDO NOMBRE NOMBRE" (PDF) al canonico "NOMBRE NOMBRE APELLIDO APELLIDO",
-// usando el roster por conjunto de palabras. Si no hay match, aplica swap de mitades (4 palabras).
+// Particulas que se unen al apellido siguiente (apellidos compuestos).
+const NAME_PARTICLES = new Set(['DE', 'DEL', 'LA', 'LAS', 'LOS', 'SAN', 'SANTA', 'MC', 'MAC', "D'", 'DA', 'DI'])
+
+// Reordena "APELLIDO_S NOMBRE_S" (PDF, apellidos primero) al canonico "NOMBRE_S APELLIDO_S".
+// Regla de nombres ecuatorianos: 2 apellidos (una particula inicial absorbe la palabra siguiente),
+// el resto son nombres de pila. Si el roster tiene el nombre canonico exacto, se usa ese.
 function canonicalName(pdfName, roster) {
   const clean = repairMojibake(pdfName).replace(/\s+/g, ' ').trim()
   if (!clean) return ''
   const words = clean.split(' ')
+  if (words.length < 3) return clean
   const key = [...words].sort().join(' ')
-  if (roster.has(key)) return roster.get(key)
-  if (words.length === 4) return `${words[2]} ${words[3]} ${words[0]} ${words[1]}`
-  if (words.length === 3) return `${words[2]} ${words[0]} ${words[1]}`
-  return clean
+  if (roster && roster.has(key)) return roster.get(key)
+
+  const surnameWords = []
+  let i = 0
+  let surnames = 0
+  while (i < words.length - 1 && surnames < 2) {
+    // Una particula (o varias encadenadas: "DE LA") se une al apellido siguiente.
+    while (i < words.length - 1 && NAME_PARTICLES.has(words[i].toUpperCase())) {
+      surnameWords.push(words[i]); i += 1
+    }
+    surnameWords.push(words[i]); i += 1
+    surnames += 1
+  }
+  const givenWords = words.slice(i)
+  if (!givenWords.length || !surnameWords.length) return clean
+  return [...givenWords, ...surnameWords].join(' ')
 }
 
 // Separa el blob "DE PARA" de una reasignacion. El "Para" (nuevo responsable) es el
@@ -820,4 +837,8 @@ export const __test__ = {
   parseIssue,
   mergeIssueChain,
   formatMovement,
+  canonicalName,
+  splitDePara,
+  parseHojaDeRuta,
+  resolveRecorrido,
 }
