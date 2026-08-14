@@ -672,23 +672,26 @@ function canonicalName(pdfName, roster) {
   return [...givenWords, ...surnameWords].join(' ')
 }
 
-// Separa el blob "DE PARA" de una reasignacion. El "Para" (nuevo responsable) es el
-// sufijo MÁS LARGO que sea un nombre completo conocido (evita truncar apellidos).
-function splitDePara(blob, roster, singleNames) {
+// Separa el blob "DE PARA" de una reasignacion usando un conjunto de nombres conocidos.
+// 1) El "Para" (nuevo responsable) es el sufijo mas largo que sea un nombre conocido.
+// 2) Si no, el "De" es el prefijo mas largo conocido y el "Para" es el resto.
+// 3) Fallback por longitud tipica (4 palabras).
+function splitDePara(blob, known) {
   const words = blob.split(' ')
   const n = words.length
-  const isKnownName = (arr) => {
-    const joined = arr.join(' ')
-    if (singleNames.has(joined)) return true
-    const key = [...arr].sort().join(' ')
-    return roster.has(key)
+  const isKnown = (arr) => known.has(arr.join(' '))
+  // 1) Sufijo (Para) mas largo conocido.
+  for (let len = Math.min(5, n - 1); len >= 2; len -= 1) {
+    if (isKnown(words.slice(n - len))) return { de: words.slice(0, n - len).join(' '), para: words.slice(n - len).join(' ') }
   }
-  // Prefiere el sufijo mas largo (nombre completo) que aparezca como nombre conocido.
-  for (let paraLen = Math.min(5, n - 1); paraLen >= 2; paraLen -= 1) {
-    const para = words.slice(n - paraLen)
-    if (isKnownName(para)) return { de: words.slice(0, n - paraLen).join(' '), para: para.join(' ') }
+  // 2) Prefijo (De) mas largo conocido -> Para = resto.
+  for (let len = Math.min(5, n - 2); len >= 2; len -= 1) {
+    const rem = words.slice(len)
+    if (isKnown(words.slice(0, len)) && rem.length >= 2 && rem.length <= 5) {
+      return { de: words.slice(0, len).join(' '), para: rem.join(' ') }
+    }
   }
-  // Fallback sin roster: los nombres suelen ser de 4 palabras (2 apellidos + 2 nombres).
+  // 3) Fallback: nombres suelen ser de 4 palabras (2 apellidos + 2 nombres).
   if (n >= 8 && n % 2 === 0) return { de: words.slice(0, n / 2).join(' '), para: words.slice(n / 2).join(' ') }
   if (n >= 4) return { de: words.slice(0, n - 4).join(' '), para: words.slice(n - 4).join(' ') }
   return { de: '', para: words.join(' ') }
@@ -718,14 +721,28 @@ const ACCION_LABEL = {
 // Resuelve responsable y ultimo movimiento a partir de las filas del recorrido (Hoja de Ruta).
 // Responsable = "Para" de la ultima Reasignacion por fecha; ultimo movimiento = ultima fila por fecha.
 function resolveRecorrido(rows, roster) {
-  // Nombres sueltos (Adjunto/Archivado/etc.) = nombres validos sin ambiguedad -> ayudan a cortar De/Para.
-  const singleNames = new Set(
-    rows.filter((r) => r.accion !== 'Reasignado').map((r) => r.blob).filter((b) => b.split(' ').length >= 2 && b.split(' ').length <= 6),
-  )
+  const okLen = (b) => b.split(' ').length >= 2 && b.split(' ').length <= 6
+  // Conjunto de nombres conocidos (orden apellidos-primero) para cortar De/Para con fiabilidad:
+  //  - filas de un solo nombre (Adjunto, Archivado, Respuesta, …)
+  //  - auto-reasignaciones "X X" (mismo nombre repetido) -> la mitad es un nombre limpio
+  const known = new Set(rows.filter((r) => r.accion !== 'Reasignado' && okLen(r.blob)).map((r) => r.blob))
+  for (const r of rows) {
+    if (r.accion !== 'Reasignado') continue
+    const w = r.blob.split(' ')
+    if (w.length % 2 === 0) {
+      const half = w.length / 2
+      const a = w.slice(0, half).join(' ')
+      if (a === w.slice(half).join(' ') && okLen(a)) known.add(a)
+    }
+  }
+  // Primera pasada: separa lo que pueda y agrega De/Para al roster de conocidos.
+  const firstPass = rows.filter((r) => r.accion === 'Reasignado').map((r) => splitDePara(r.blob, known))
+  for (const s of firstPass) { if (s.de && okLen(s.de)) known.add(s.de); if (s.para && okLen(s.para)) known.add(s.para) }
+
   const events = rows.map((row, i) => {
     let para = ''
     if (row.accion === 'Reasignado') {
-      const split = splitDePara(row.blob, roster, singleNames)
+      const split = splitDePara(row.blob, known)
       para = split.para ? canonicalName(split.para, roster) : ''
     }
     return { ...row, para, ts: rutaTimestamp(row.date), order: i }
