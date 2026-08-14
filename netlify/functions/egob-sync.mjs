@@ -583,16 +583,20 @@ export async function diagnosePdf(issue) {
   const key = apiKeyFrom(page.html)
   const out = { issue, keyFound: Boolean(key) }
   try {
-    const text = await fetchRecorridoText(jar, issue, key)
-    out.textLen = text.length
-    const movs = extractMovements(String(issue), text)
-    out.movimientos = movs.length
-    out.numeroMovimientoMax = Math.max(0, ...[...text.matchAll(/#(\d{1,4})(?!\d)/g)].map((m) => Number(m[1])))
-    const owner = pickLatestOwner(movs)
-    out.responsable = owner?.responsable
-    out.ultimo = formatMovement(pickLatestMovement(movs), String(issue))
-    out.textHead = text.slice(0, 3500).replace(/\n/g, ' ⏎ ')
-    out.textTail = text.slice(-3500).replace(/\n/g, ' ⏎ ')
+    const url = `${EGOB_BASE_URL}/issues/${encodeURIComponent(issue)}/download_recorrido_pdf${key ? `?key=${key}` : ''}`
+    const { response, buffer } = await followBinary(jar, url)
+    out.pdfStatus = response.status
+    out.pdfBytes = buffer?.length || 0
+    const { PDFParse } = await import('pdf-parse')
+    const parser = new PDFParse({ data: buffer })
+    const table = await parser.getTable()
+    // Estructura de getTable: pages[].tables[].rows[] (cada row = array de celdas)
+    const pages = table?.pages || []
+    const rows = pages.flatMap((p) => (p.tables || []).flatMap((t) => t.rows || t || []))
+    out.tablePages = pages.length
+    out.tableRowCount = rows.length
+    out.tableSample = rows.slice(0, 4).map((r) => (Array.isArray(r) ? r.map((c) => String(c).replace(/\s+/g, ' ').slice(0, 30)) : String(r).slice(0, 120)))
+    out.tableTail = rows.slice(-6).map((r) => (Array.isArray(r) ? r.map((c) => String(c).replace(/\s+/g, ' ').slice(0, 30)) : String(r).slice(0, 120)))
   } catch (error) {
     out.error = String(error?.message || error).slice(0, 200)
   }
