@@ -516,3 +516,8 @@ main { padding:30px 34px 48px;max-width:1600px;margin:auto; }
   .operative-edit-grid .span-2, .operative-edit-review { grid-column:span 1; }
   .operativa-card-actions .button { flex:1 1 100%; }
 }
+
+/* KPI "Trámites por tipo de proyecto" (vista ejecutiva) */
+.type-kpi-card { padding:18px; }
+.type-bars { display:grid; grid-template-columns:1fr 1fr; gap:12px 26px; margin-top:6px; }
+@media (max-width:720px) { .type-bars { grid-template-columns:1fr; } }

@@ -57,6 +57,20 @@ export function Dashboard() {
   }, [processes])
   const priorityMax = Math.max(...priorityData.map((item) => item.value), 1)
 
+  const TYPE_COLORS = ['#0f766e', '#2563eb', '#7c3aed', '#db2777', '#ea580c', '#059669', '#0891b2', '#4f46e5', '#b45309', '#65a30d', '#9333ea', '#dc2626']
+  const typeData = useMemo(() => {
+    const totals = processes.reduce<Record<string, number>>((acc, item) => {
+      const name = repairMojibake(item.tipo?.nombre ?? 'Sin tipo')
+      acc[name] = (acc[name] ?? 0) + 1
+      return acc
+    }, {})
+    return Object.entries(totals)
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value)
+      .map((item, index) => ({ ...item, color: TYPE_COLORS[index % TYPE_COLORS.length] }))
+  }, [processes])
+  const typeMax = Math.max(...typeData.map((item) => item.value), 1)
+
 
   const executivePortfolio = processes
     .filter((item) => repairMojibake(item.estado?.nombre) !== 'Finalizado')
@@ -131,6 +145,16 @@ export function Dashboard() {
             </article>)}</div>
           </div>
         </div>
+      </Card>
+    </section>
+    <section className="type-kpi-section">
+      <Card className="chart-card type-kpi-card">
+        <div className="card-heading"><div><p className="eyebrow">Composición</p><h3>Trámites por tipo de proyecto</h3></div><Layers3 size={20} /></div>
+        <div className="priority-bars type-bars">{typeData.map((item) => <article className="priority-row" key={item.name}>
+          <div className="priority-row-copy"><span><i style={{ background: item.color }} />{repairMojibake(item.name)}</span><strong>{item.value}</strong></div>
+          <div className="priority-track"><i style={{ width: `${Math.max((item.value / typeMax) * 100, 4)}%`, background: item.color }} /></div>
+          <small>{Math.round((item.value / Math.max(processes.length, 1)) * 100)}% del portafolio</small>
+        </article>)}</div>
       </Card>
     </section>
     <section className="critical-section">
