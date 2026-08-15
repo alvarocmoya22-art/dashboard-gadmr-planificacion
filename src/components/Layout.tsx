@@ -31,7 +31,11 @@ export function Layout({ children }: { children: ReactNode }) {
   const { pathname } = useLocation()
   const navigate = useNavigate()
   const { canAccessManagement, demoMode, userName, role, globalSearch, setGlobalSearch, logs, processes, statuses } = useApp()
-  const visibleNav = canAccessManagement ? managementNav : operatorNav
+  // El admin ve AMBAS vistas (ejecutiva + operativa); el Director solo la ejecutiva; el operador solo la operativa.
+  const visibleNav = [
+    ...(canAccessManagement ? managementNav : []),
+    ...(!canAccessManagement || role === 'admin' ? operatorNav : []),
+  ]
   const [title, description] = titles[pathname] ?? ['Detalle del trámite', 'Trazabilidad completa del trámite institucional.']
   const showGlobalSearch = pathname === '/procesos'
   const logoUrl = `${import.meta.env.BASE_URL}gadmr-logo.png`
