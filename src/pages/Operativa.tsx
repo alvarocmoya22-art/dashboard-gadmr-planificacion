@@ -1,16 +1,20 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ExternalLink, FileText, MessageSquareText, Paperclip, PencilLine, Search, UserRound } from 'lucide-react'
-import { Badge, Card, EmptyState } from '../components/ui'
+import { ExternalLink, FileText, MessageSquareText, Paperclip, PencilLine, Plus, Search, UserRound } from 'lucide-react'
+import { Badge, Button, Card, EmptyState } from '../components/ui'
+import { ProcessForm } from '../components/ProcessForm'
 import { useApp } from '../store/AppContext'
+import { canCreateProcesses } from '../lib/permissions'
 import { repairMojibake } from '../lib/utils'
 import { getEgobIssueNumber, getEgobIssueUrl } from '../lib/egob'
 
 export function Operativa() {
-  const { processes, comments, attachments, openAttachment } = useApp()
+  const { processes, comments, attachments, openAttachment, role, userEmail } = useApp()
   const navigate = useNavigate()
   const [query, setQuery] = useState('')
+  const [creating, setCreating] = useState(false)
+  const canCreate = canCreateProcesses(role, userEmail)
 
   const active = useMemo(
     () => processes.filter((process) => repairMojibake(process.estado?.nombre ?? '') !== 'Finalizado'),
@@ -37,9 +41,12 @@ export function Operativa() {
   }
 
   return <div className="operativa">
-    <div className="operativa-search">
-      <Search size={18} />
-      <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar por nº eGob, nombre o responsable…" />
+    <div className="operativa-top">
+      <div className="operativa-search">
+        <Search size={18} />
+        <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar por nº eGob, nombre o responsable…" />
+      </div>
+      {canCreate && <Button onClick={() => setCreating(true)}><Plus size={17} /> Nuevo trámite</Button>}
     </div>
     <p className="operativa-count">{filtered.length} trámite{filtered.length === 1 ? '' : 's'} por gestionar</p>
 
@@ -87,5 +94,6 @@ export function Operativa() {
         </Card>
       })}
     </div> : <EmptyState title="Sin trámites por gestionar" description="No hay trámites activos que coincidan con tu búsqueda." />}
+    {creating && <ProcessForm onClose={() => setCreating(false)} />}
   </div>
 }

@@ -478,6 +478,9 @@ main { padding:30px 34px 48px;max-width:1600px;margin:auto; }
 
 /* ---------- Vista operativa (operador) ---------- */
 .operativa { display:flex; flex-direction:column; gap:14px; }
+.operativa-top { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.operativa-top .operativa-search { flex:1; max-width:520px; }
+.operativa-top .button { white-space:nowrap; }
 .operativa-search { display:flex; align-items:center; gap:9px; background:#fff; border:1px solid var(--line); border-radius:12px; padding:10px 14px; color:var(--muted); max-width:520px; }
 .operativa-search input { border:0; outline:0; background:transparent; font-size:13px; color:#17323a; width:100%; }
 .operativa-count { font-size:12px; font-weight:700; color:var(--muted); }
