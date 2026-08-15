@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ExternalLink, FileText, MessageSquareText, Paperclip, Pencil, PencilLine, Plus, Search, UserRound } from 'lucide-react'
+import { ExternalLink, FileText, MessageSquareText, Paperclip, Pencil, PencilLine, Plus, Search, Tag, UserRound } from 'lucide-react'
 import { Badge, Button, Card, EmptyState } from '../components/ui'
 import { ProcessForm } from '../components/ProcessForm'
 import { useApp } from '../store/AppContext'
@@ -72,6 +72,10 @@ export function Operativa() {
           </div>
 
           <div className="operativa-card-grid">
+            <div>
+              <span><Tag size={13} /> Tipo de proyecto</span>
+              <strong>{repairMojibake(process.tipo?.nombre || '—')}</strong>
+            </div>
             <div>
               <span><UserRound size={13} /> Actualmente con</span>
               <strong>{repairMojibake(process.egob_responsable_actual || 'Pendiente de sincronizar')}</strong>
