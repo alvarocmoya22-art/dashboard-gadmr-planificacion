@@ -1,5 +1,5 @@
 ﻿import { useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
 import { ArrowLeft, Building2, CalendarDays, CheckCircle2, Clock3, Download, ExternalLink, FileText, History, MessageSquareText, Paperclip, SlidersHorizontal, Trash2, UserRound } from 'lucide-react'
 import { Badge, Button, Card, EmptyState, Field, Input, Select, Textarea } from '../components/ui'
@@ -11,14 +11,17 @@ import type { Process, ProcessFormData } from '../types'
 
 export function ProcessDetail() {
   const { id } = useParams()
+  const navigate = useNavigate()
   const { processes, logs, comments, attachments, addComment, deleteComment, uploadAttachment, deleteAttachment, openAttachment, role, userEmail, canAccessManagement } = useApp()
   const [commentText, setCommentText] = useState('')
   const [uploading, setUploading] = useState(false)
   const process = processes.find((item) => item.id === id)
   if (!process) return <EmptyState title="Proceso no encontrado" description="El registro pudo haber sido archivado o no tienes acceso." />
   const currentProcess = process
-  // El Director vuelve a su lista ejecutiva; el resto (admin/operador) a la Vista operativa (lista de trámites).
-  const backLink = canAccessManagement && role !== 'admin' ? '/' : '/operativa'
+  // "Atrás" regresa a la vista de donde entraste (lista de trámites, ejecutiva, etc.).
+  // Si no hay historial (enlace directo), cae a una lista por defecto según el rol.
+  const backFallback = canAccessManagement ? '/procesos' : '/operativa'
+  const goBack = () => { if (window.history.length > 1) navigate(-1); else navigate(backFallback) }
   const canEdit = canEditProcesses(role, userEmail)
 
   const processLogs = logs.filter((item) => item.process_id === currentProcess.id)
@@ -78,7 +81,7 @@ export function ProcessDetail() {
   }
 
   return <div className="detail-page">
-    <Link to={backLink} className="back-link"><ArrowLeft size={17} /> Volver a trámites</Link>
+    <button type="button" onClick={goBack} className="back-link"><ArrowLeft size={17} /> Volver a trámites</button>
     <Card className="detail-hero"><div><small>{process.codigo_proceso}</small><h2>{repairMojibake(process.nombre_proceso)}</h2><p>{process.objetivo ? repairMojibake(process.objetivo) : 'Sin objetivo registrado.'}</p><div className="detail-badges"><Badge color={process.estado?.color}>{repairMojibake(process.estado?.nombre)}</Badge><Badge color={process.prioridad?.color}>{repairMojibake(process.prioridad?.nombre)}</Badge><Badge>{repairMojibake(process.confidencialidad)}</Badge></div></div><div className="hero-progress"><div style={{ '--progress': `${process.porcentaje_avance * 3.6}deg` } as React.CSSProperties}><span>{process.porcentaje_avance}%</span></div><small>avance registrado</small></div></Card>
     <div className="detail-grid"><div className="detail-main">
       <Card className="info-card"><h3>Información general</h3><div className="info-grid"><Info icon={UserRound} label="Responsable principal" value={process.responsable_principal} /><Info icon={UserRound} label="Responsable secundario" value={process.responsable_secundario || '—'} /><Info icon={UserRound} label="Actualmente con eGob" value={process.egob_responsable_actual || 'Pendiente de sincronizar'} /><Info icon={Building2} label="Dirección / cargo eGob" value={process.egob_responsable_cargo || 'No identificado'} /><Info icon={CalendarDays} label="Fecha inicio" value={formatDate(process.fecha_inicio)} /><Info icon={CalendarDays} label="Fin programado" value={formatDate(process.fecha_fin_programada)} /><Info icon={Clock3} label="Próxima revisión interna" value={formatDate(process.fecha_proxima_revision)} hint="Recordatorio para seguimiento del dashboard; no se envía automáticamente al eGob." /><Info icon={FileText} label="Documento respaldo" value={process.documento_respaldo || '—'} /></div></Card>
