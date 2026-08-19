@@ -30,7 +30,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const [seenNotifications, setSeenNotifications] = useState(() => Number(localStorage.getItem('status-notifications-seen') || 0))
   const { pathname } = useLocation()
   const navigate = useNavigate()
-  const { canAccessManagement, demoMode, userName, role, globalSearch, setGlobalSearch, logs, processes, statuses } = useApp()
+  const { canAccessManagement, demoMode, userName, role, globalSearch, setGlobalSearch, logs, processes, statuses, comments } = useApp()
   // El admin ve AMBAS vistas (ejecutiva + operativa); el Director solo la ejecutiva; el operador solo la operativa.
   const visibleNav = [
     ...(canAccessManagement ? managementNav : []),
@@ -83,8 +83,23 @@ export function Layout({ children }: { children: ReactNode }) {
         created_at: process.fecha_proxima_revision || process.updated_at,
       }))
 
-    return [...reviewItems, ...egobItems, ...statusItems].slice(0, 12)
-  }, [logs, processes, statuses])
+    const commentItems = comments
+      .slice(0, 8)
+      .map((comment) => {
+        const process = processes.find((processItem) => processItem.id === comment.process_id)
+        return {
+          id: `comment-${comment.id}`,
+          process,
+          title: 'Nuevo comentario interno',
+          detail: repairMojibake(comment.contenido),
+          created_at: comment.created_at,
+        }
+      })
+
+    return [...commentItems, ...reviewItems, ...egobItems, ...statusItems]
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 14)
+  }, [logs, processes, statuses, comments])
 
   const unreadNotifications = Math.max(0, notifications.length - seenNotifications)
 

@@ -478,8 +478,7 @@ main { padding:30px 34px 48px;max-width:1600px;margin:auto; }
 
 /* ---------- Vista operativa (operador) ---------- */
 .operativa { display:flex; flex-direction:column; gap:14px; }
-.operativa-top { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
-.operativa-top .operativa-search { flex:1; max-width:520px; }
+.operativa-top { display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; }
 .operativa-top .button { white-space:nowrap; }
 .operativa-search { display:flex; align-items:center; gap:9px; background:#fff; border:1px solid var(--line); border-radius:12px; padding:10px 14px; color:var(--muted); max-width:520px; }
 .operativa-search input { border:0; outline:0; background:transparent; font-size:13px; color:#17323a; width:100%; }
@@ -521,3 +520,9 @@ main { padding:30px 34px 48px;max-width:1600px;margin:auto; }
 .type-kpi-card { padding:18px; }
 .type-bars { display:grid; grid-template-columns:1fr 1fr; gap:12px 26px; margin-top:6px; }
 @media (max-width:720px) { .type-bars { grid-template-columns:1fr; } }
+
+/* Trámites relacionados (detalle) */
+.related-list { display:flex; flex-wrap:wrap; gap:8px; margin:4px 0 8px; }
+.related-chip { display:inline-flex; align-items:center; gap:6px; padding:7px 11px; border:1px solid #cfe6df; border-radius:9px; background:#f4fbf8; color:#0f766e; font-size:12px; font-weight:700; }
+.related-chip:hover { background:var(--mint); }
+.related-note { font-size:10px; color:var(--muted); margin:0; }

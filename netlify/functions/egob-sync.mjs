@@ -495,6 +495,7 @@ export async function loginAndReadIssue(issue) {
           actualizado_en: rec.actualizado_en || base.actualizado_en,
           tramites_hijos: base.tramites_hijos,
           tramites_revisados: [issue],
+          tramites_relacionados: extractRelated(text, base.tramites_hijos, issue),
           fuente: 'recorrido_pdf',
           sincronizado_en: new Date().toISOString(),
         }
@@ -505,7 +506,20 @@ export async function loginAndReadIssue(issue) {
   }
 
   const relatedIssues = await readRelatedIssues(jar, issue, base.tramites_hijos)
-  return mergeIssueChain(base, relatedIssues)
+  const merged = mergeIssueChain(base, relatedIssues)
+  merged.tramites_relacionados = [...new Set([...(merged.tramites_revisados || []), ...(merged.tramites_hijos || [])])]
+    .map((value) => String(value).replace(/\D/g, ''))
+    .filter((value) => value && value !== String(issue))
+  return merged
+}
+
+// Números de trámites relacionados (cadena madre/hijos, "insistos") detectados en el recorrido.
+function extractRelated(recorridoText, hijos, rootIssue) {
+  const nums = new Set()
+  for (const m of String(recorridoText).matchAll(/#\s*(\d{5,})/g)) nums.add(m[1])
+  for (const m of String(recorridoText).matchAll(/\(\s*(\d{5,})\s*\)/g)) nums.add(m[1])
+  for (const child of hijos || []) { const n = String(child).replace(/\D/g, ''); if (n) nums.add(n) }
+  return [...nums].filter((n) => n && n !== String(rootIssue))
 }
 
 // Diagnostico: devuelve la estructura REAL de eGob (texto aplanado + movimientos extraidos)

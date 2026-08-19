@@ -31,6 +31,7 @@ export interface Process {
   egob_responsable_actual?: string
   egob_responsable_cargo?: string
   egob_ultimo_movimiento?: string
+  egob_tramites_relacionados?: string[]
   proxima_accion?: string
   objetivo?: string
   observaciones?: string

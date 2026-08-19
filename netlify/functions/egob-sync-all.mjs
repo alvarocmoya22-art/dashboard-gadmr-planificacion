@@ -65,6 +65,14 @@ export function computeEgobUpdate(process, egob, nowIso = new Date().toISOString
     }
   }
 
+  // Trámites relacionados (arreglo): se comparan por contenido.
+  const relNew = Array.isArray(egob.tramites_relacionados) ? egob.tramites_relacionados.map(String) : []
+  const relOld = Array.isArray(process.egob_tramites_relacionados) ? process.egob_tramites_relacionados.map(String) : []
+  if (relNew.length && JSON.stringify([...relNew].sort()) !== JSON.stringify([...relOld].sort())) {
+    payload.egob_tramites_relacionados = relNew
+    hasChanges = true
+  }
+
   if (!hasChanges) return null
 
   // Una unica notificacion por movimiento: la fila representativa de mayor prioridad.
@@ -87,7 +95,7 @@ export default async function scheduledEgobSync() {
   const supabase = getSupabaseAdmin()
   const { data: processes, error } = await supabase
     .from('processes')
-    .select('id,codigo_proceso,nombre_proceso,documento_respaldo,egob_numero,egob_url,egob_estado,egob_responsable_actual,egob_responsable_cargo,egob_ultimo_movimiento,egob_sincronizado_en')
+    .select('id,codigo_proceso,nombre_proceso,documento_respaldo,egob_numero,egob_url,egob_estado,egob_responsable_actual,egob_responsable_cargo,egob_ultimo_movimiento,egob_sincronizado_en,egob_tramites_relacionados')
     .eq('activo', true)
     .or('egob_numero.not.is.null,documento_respaldo.not.is.null')
 

@@ -179,6 +179,8 @@ export function Dashboard() {
             <strong>{processName}</strong>
             <span className="executive-info-line line-attachment"><Paperclip size={12} /><b>Último adjunto</b><em>{attachmentName}</em></span>
             <span className="executive-info-line line-owner"><b>Actualmente con eGob</b><em>{egobOwner}{egobRole ? ` · ${egobRole}` : ''}</em></span>
+            <span className="executive-info-line line-action"><b>Próxima acción</b><em>{process.proxima_accion ? repairMojibake(process.proxima_accion) : 'Sin próxima acción'}</em></span>
+            <span className="executive-info-line line-review"><b>Próxima revisión</b><em>{process.fecha_proxima_revision ? formatDate(process.fecha_proxima_revision) : '—'}</em></span>
             <span className="executive-info-line line-comment"><b>Último comentario</b><em>{commentText}</em></span>
             <span className="executive-info-line line-movement"><b>Último movimiento eGob</b><em>{movementText}</em></span>
           </div>
