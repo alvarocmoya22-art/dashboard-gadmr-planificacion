@@ -1,5 +1,9 @@
 export type Role = 'admin' | 'gerente' | 'responsable' | 'lector'
 export type TrafficLight = 'Verde' | 'Amarillo' | 'Rojo' | 'Azul' | 'Gris'
+export interface FlujoStep {
+  texto: string
+  hecho: boolean
+}
 
 export interface CatalogItem {
   id: string
@@ -33,6 +37,7 @@ export interface Process {
   egob_ultimo_movimiento?: string
   egob_tramites_relacionados?: string[]
   proxima_accion?: string
+  flujo?: FlujoStep[]
   objetivo?: string
   observaciones?: string
   fecha_proxima_revision?: string
@@ -102,6 +107,7 @@ export interface ProcessFormData {
   egob_responsable_cargo?: string
   egob_ultimo_movimiento?: string
   proxima_accion?: string
+  flujo?: FlujoStep[]
   objetivo?: string
   observaciones?: string
   fecha_proxima_revision?: string

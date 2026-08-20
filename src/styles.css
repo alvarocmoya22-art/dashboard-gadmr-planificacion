@@ -530,3 +530,19 @@ main { padding:30px 34px 48px;max-width:1600px;margin:auto; }
 .related-chip { display:inline-flex; align-items:center; gap:6px; padding:7px 11px; border:1px solid #cfe6df; border-radius:9px; background:#f4fbf8; color:#0f766e; font-size:12px; font-weight:700; }
 .related-chip:hover { background:var(--mint); }
 .related-note { font-size:10px; color:var(--muted); margin:0; }
+
+/* Flujo / checklist (Próxima acción) */
+.flujo-field { display:flex; flex-direction:column; gap:8px; }
+.flujo-head { display:flex; justify-content:space-between; align-items:center; font-size:11px; font-weight:800; color:#49636a; }
+.flujo-head strong { color:var(--teal); }
+.flujo-list { display:flex; flex-direction:column; gap:6px; }
+.flujo-step { display:flex; align-items:center; gap:9px; background:#fff; border:1px solid var(--line); border-radius:9px; padding:8px 10px; font-size:12px; }
+.flujo-step input[type=checkbox] { width:16px; height:16px; accent-color:var(--teal); flex:none; cursor:pointer; }
+.flujo-step span { flex:1; color:#17323a; word-break:break-word; }
+.flujo-step.done span { text-decoration:line-through; color:#8a9b9f; }
+.flujo-del { border:0; background:none; color:#b8c3c3; font-size:18px; line-height:1; padding:0 2px; cursor:pointer; flex:none; }
+.flujo-del:hover { color:#b42323; }
+.flujo-add { display:flex; gap:8px; }
+.flujo-add .field { flex:1; }
+.flujo-add .button { white-space:nowrap; }
+.flujo-hint { font-size:10px; color:var(--muted); }
