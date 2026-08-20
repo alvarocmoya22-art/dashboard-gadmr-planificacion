@@ -5,7 +5,7 @@ import { Link } from 'react-router-dom'
 import { Card, Badge } from '../components/ui'
 import { useApp } from '../store/AppContext'
 import { getEgobIssueNumber, getEgobIssueUrl } from '../lib/egob'
-import { formatDate, normalizeText, repairMojibake } from '../lib/utils'
+import { formatDate, normalizeText, repairMojibake, todayIso } from '../lib/utils'
 
 
 export function Dashboard() {
@@ -72,8 +72,10 @@ export function Dashboard() {
   const typeMax = Math.max(...typeData.map((item) => item.value), 1)
 
 
+  // La agenda del Director muestra SOLO los trámites pendientes de revisión (fecha ≤ hoy).
   const executivePortfolio = processes
-    .filter((item) => repairMojibake(item.estado?.nombre) !== 'Finalizado')
+    .filter((item) => repairMojibake(item.estado?.nombre) !== 'Finalizado'
+      && Boolean(item.fecha_proxima_revision) && String(item.fecha_proxima_revision) <= todayIso())
     .sort((a, b) => {
       const priorityScore = (item: typeof a) => item.semaforo === 'Rojo' ? 0 : repairMojibake(item.prioridad?.nombre) === 'Alta' ? 1 : item.semaforo === 'Amarillo' ? 2 : 3
       return priorityScore(a) - priorityScore(b) || String(a.fecha_fin_programada ?? '').localeCompare(String(b.fecha_fin_programada ?? ''))
@@ -100,7 +102,7 @@ export function Dashboard() {
     ].map((value) => normalizeText(repairMojibake(value ?? ''))).join(' ').toLocaleLowerCase('es')
     return text.includes(executiveQuery)
   })
-  const executivePreview = executiveFiltered.slice(0, 6)
+  const executivePreview = executiveFiltered
 
   const kpis = [
     { label: 'Trámites activos', value: metrics.active.length, note: `${processes.length} en seguimiento`, icon: BriefcaseBusiness, tone: 'teal' },
@@ -140,7 +142,7 @@ export function Dashboard() {
       </Card>
     </section>
     <section className="critical-section">
-      <div className="section-title"><div><p className="eyebrow">Agenda del Director</p><h2>Vista ejecutiva de trámites</h2><span>{executivePortfolio.length} trámites activos con responsable eGob, último movimiento, comentario y adjunto disponible cuando exista · se muestran 6 por defecto</span></div><Link to="/procesos">Ver portafolio completo <ArrowRight size={16} /></Link></div>
+      <div className="section-title"><div><p className="eyebrow">Agenda del Director</p><h2>Trámites pendientes de revisión</h2><span>{executivePortfolio.length} trámite{executivePortfolio.length === 1 ? '' : 's'} pendiente{executivePortfolio.length === 1 ? '' : 's'} de revisión (fecha llegada o vencida) · responsable eGob, último movimiento, comentario y adjunto cuando exista</span></div><Link to="/procesos">Ver portafolio completo <ArrowRight size={16} /></Link></div>
       <div className="executive-search"><Search size={16} /><input value={portfolioSearch} onChange={(event) => setPortfolioSearch(event.target.value)} placeholder="Buscar trámite, código, área, responsable o eGob…" /></div>
       <div className="critical-list">{executivePreview.length ? executivePreview.map((process) => {
         const egobNumber = getEgobIssueNumber(process)
@@ -176,7 +178,7 @@ export function Dashboard() {
           </div>
           <Link className="row-detail-link" to={`/procesos/${process.id}`} aria-label={`Ver detalle de ${processName}`}><ArrowRight size={17} /></Link>
         </article>
-      }) : <p className="all-clear">No se encontraron trámites con ese criterio.</p>}</div>
+      }) : <p className="all-clear">{portfolioSearch ? 'No se encontraron trámites con ese criterio.' : 'No hay trámites pendientes de revisión por ahora.'}</p>}</div>
     </section>
   </div>
 }
