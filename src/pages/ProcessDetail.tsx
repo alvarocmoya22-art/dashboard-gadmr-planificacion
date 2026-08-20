@@ -1,12 +1,13 @@
 ﻿import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowLeft, Building2, CalendarDays, CheckCircle2, Clock3, Download, ExternalLink, FileText, History, MessageSquareText, Paperclip, Plus, SlidersHorizontal, Trash2, UserRound } from 'lucide-react'
+import { ArrowLeft, Building2, CalendarDays, CheckCircle2, Clock3, Download, ExternalLink, FileText, History, MessageSquareText, Paperclip, SlidersHorizontal, Trash2, UserRound } from 'lucide-react'
 import { Badge, Button, Card, EmptyState, Field, Input, Select, Textarea } from '../components/ui'
 import { useApp } from '../store/AppContext'
 import { canEditProcesses } from '../lib/permissions'
 import { formatDate, repairMojibake, todayIso } from '../lib/utils'
 import { EGOB_BASE_URL, getEgobIssueNumber, getEgobIssueUrl } from '../lib/egob'
+import { FlujoEditor, stepsToText, textToSteps } from '../components/FlujoEditor'
 import type { FlujoStep, Process, ProcessFormData } from '../types'
 
 export function ProcessDetail() {
@@ -128,20 +129,6 @@ function toFormData(process: Process): ProcessFormData {
   }
 }
 
-// Convierte texto "1. Paso uno 2. Paso dos" en pasos del checklist.
-function textToSteps(text?: string): FlujoStep[] {
-  const clean = repairMojibake(text ?? '').trim()
-  if (!clean) return []
-  const parts = clean.split(/\s*\d+[.)]\s*/).map((part) => part.trim()).filter(Boolean)
-  const steps = parts.length ? parts : [clean]
-  return steps.map((texto) => ({ texto, hecho: false }))
-}
-
-// Resumen en texto de los pasos, para que se siga viendo en la tarjeta ejecutiva.
-function stepsToText(flujo: FlujoStep[]): string {
-  return flujo.map((step, index) => `${index + 1}. ${step.texto}`).join('  ')
-}
-
 // Panel de gestión para el operador (y gerencia): estado, Próxima acción (checklist/flujo con
 // avance automático), observaciones y próxima revisión. No crea ni elimina trámites.
 function OperativeEdit({ process }: { process: Process }) {
@@ -151,7 +138,6 @@ function OperativeEdit({ process }: { process: Process }) {
   const [flujo, setFlujo] = useState<FlujoStep[]>(() => (
     Array.isArray(process.flujo) && process.flujo.length ? process.flujo : textToSteps(process.proxima_accion)
   ))
-  const [newStep, setNewStep] = useState('')
   const [observaciones, setObservaciones] = useState(repairMojibake(process.observaciones ?? ''))
   const [revision, setRevision] = useState(process.fecha_proxima_revision ?? '')
   const [saving, setSaving] = useState(false)
@@ -159,10 +145,6 @@ function OperativeEdit({ process }: { process: Process }) {
   const hasFlujo = flujo.length > 0
   const done = flujo.filter((step) => step.hecho).length
   const flujoAvance = hasFlujo ? Math.round((done / flujo.length) * 100) : avance
-
-  const toggle = (index: number) => setFlujo((old) => old.map((step, i) => i === index ? { ...step, hecho: !step.hecho } : step))
-  const removeStep = (index: number) => setFlujo((old) => old.filter((_, i) => i !== index))
-  const addStep = () => { const texto = newStep.trim(); if (!texto) return; setFlujo((old) => [...old, { texto, hecho: false }]); setNewStep('') }
 
   async function save(nextRevision = revision) {
     setSaving(true)
@@ -189,21 +171,7 @@ function OperativeEdit({ process }: { process: Process }) {
       <Field label="Estado"><Select value={estadoId} onChange={(event) => setEstadoId(event.target.value)}>{statuses.map((item) => <option key={item.id} value={item.id}>{repairMojibake(item.nombre)}</option>)}</Select></Field>
       {!hasFlujo && <Field label={`Avance · ${avance}%`}><Input type="range" min="0" max="100" value={avance} onChange={(event) => setAvance(Number(event.target.value))} /></Field>}
 
-      <div className="span-2 flujo-field">
-        <div className="flujo-head"><span>Próxima acción</span>{hasFlujo && <strong>{flujoAvance}% · {done}/{flujo.length}</strong>}</div>
-        <div className="flujo-list">
-          {flujo.map((step, index) => <label key={index} className={`flujo-step ${step.hecho ? 'done' : ''}`}>
-            <input type="checkbox" checked={step.hecho} onChange={() => toggle(index)} />
-            <span>{repairMojibake(step.texto)}</span>
-            <button type="button" className="flujo-del" title="Quitar paso" onClick={() => removeStep(index)}>×</button>
-          </label>)}
-        </div>
-        <div className="flujo-add">
-          <Input value={newStep} onChange={(event) => setNewStep(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); addStep() } }} placeholder="Agregar paso…" />
-          <button type="button" className="button button-secondary" onClick={addStep}><Plus size={15} /> Agregar</button>
-        </div>
-        {hasFlujo && <small className="flujo-hint">El avance se calcula automáticamente según los pasos marcados.</small>}
-      </div>
+      <div className="span-2"><FlujoEditor flujo={flujo} onChange={setFlujo} /></div>
 
       <Field label="Observaciones" className="span-2"><Textarea value={observaciones} onChange={(event) => setObservaciones(event.target.value)} placeholder="Notas de seguimiento…" /></Field>
       <Field label="Próxima revisión interna"><Input type="date" value={revision} onChange={(event) => setRevision(event.target.value)} /></Field>

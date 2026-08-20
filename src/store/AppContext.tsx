@@ -32,14 +32,14 @@ interface AppState {
   deleteAttachment: (attachment: ProcessAttachment) => Promise<void>
   openAttachment: (attachment: ProcessAttachment) => Promise<void>
   importProcesses: (rows: ProcessFormData[]) => Promise<number>
-  addCatalogItem: (kind: CatalogKind, name: string) => Promise<void>
+  addCatalogItem: (kind: CatalogKind, name: string) => Promise<CatalogItem | undefined>
   updateCatalogItem: (kind: CatalogKind, id: string, name: string) => Promise<void>
   deleteCatalogItem: (kind: CatalogKind, id: string) => Promise<void>
 }
 
 const AppContext = createContext<AppState | null>(null)
 const storageKey = 'tramites-varios-processes-v1'
-type CatalogKind = 'areas' | 'processTypes' | 'statuses' | 'priorities'
+export type CatalogKind = 'areas' | 'processTypes' | 'statuses' | 'priorities'
 
 const catalogTables: Record<CatalogKind, 'areas' | 'process_types' | 'process_statuses' | 'priorities'> = {
   areas: 'areas',
@@ -386,20 +386,25 @@ export function AppProvider({ children }: { children: ReactNode }) {
     if (kind === 'priorities') setPriorities(updater)
   }
 
-  async function addCatalogItem(kind: CatalogKind, nombre: string) {
+  async function addCatalogItem(kind: CatalogKind, nombre: string): Promise<CatalogItem | undefined> {
     const cleanName = repairMojibake(nombre).trim()
-    if (!cleanName) return
+    if (!cleanName) return undefined
+    let created: CatalogItem | undefined
     if (supabase) {
       const payload: Partial<CatalogItem> = { nombre: cleanName, activo: true }
       if (kind === 'statuses' || kind === 'priorities') payload.orden = (kind === 'statuses' ? statuses.length : priorities.length) + 1
       const { data, error } = await supabase.from(catalogTables[kind]).insert(payload).select('*').single()
       if (error) throw error
-      if (data) setCatalogState(kind, (old) => [...old, { ...data, nombre: repairMojibake(data.nombre) }])
+      if (data) {
+        created = { ...data, nombre: repairMojibake(data.nombre) }
+        setCatalogState(kind, (old) => [...old, created!])
+      }
     } else {
-      const item = { id: uid(), nombre: cleanName, activo: true }
-      setCatalogState(kind, (old) => [...old, item])
+      created = { id: uid(), nombre: cleanName, activo: true }
+      setCatalogState(kind, (old) => [...old, created!])
     }
     toast.success('Catálogo actualizado')
+    return created
   }
 
   async function updateCatalogItem(kind: CatalogKind, id: string, nombre: string) {

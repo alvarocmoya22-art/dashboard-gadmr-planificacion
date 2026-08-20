@@ -2,11 +2,13 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
-import { X } from 'lucide-react'
+import { Plus, X } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button, Field, Input, Select, Textarea } from './ui'
+import { FlujoEditor, stepsToText, textToSteps } from './FlujoEditor'
 import { useApp } from '../store/AppContext'
-import type { Process, ProcessFormData } from '../types'
+import type { CatalogKind } from '../store/AppContext'
+import type { FlujoStep, Process, ProcessFormData } from '../types'
 import { repairMojibake, todayIso } from '../lib/utils'
 
 const schema = z.object({
@@ -39,8 +41,14 @@ const schema = z.object({
 })
 
 export function ProcessForm({ process, onClose }: { process?: Process; onClose: () => void }) {
-  const { areas, processTypes, statuses, priorities, saveProcess, addComment } = useApp()
+  const { areas, processTypes, statuses, priorities, saveProcess, addComment, addCatalogItem } = useApp()
   const [initialComment, setInitialComment] = useState('')
+  const [flujo, setFlujo] = useState<FlujoStep[]>(() => (
+    Array.isArray(process?.flujo) && process.flujo.length ? process.flujo : textToSteps(process?.proxima_accion)
+  ))
+  // Agregar un área / tipo nuevo sin salir del formulario.
+  const [adding, setAdding] = useState<null | 'areas' | 'processTypes'>(null)
+  const [newCatalog, setNewCatalog] = useState('')
   const form = useForm<ProcessFormData>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -69,9 +77,30 @@ export function ProcessForm({ process, onClose }: { process?: Process; onClose: 
     }
   }, [progress, finalStatus, statusId, form])
 
+  async function createCatalog(kind: CatalogKind, field: 'area_id' | 'tipo_proceso_id') {
+    const name = newCatalog.trim()
+    if (!name) return
+    try {
+      const item = await addCatalogItem(kind, name)
+      if (item) form.setValue(field, item.id, { shouldValidate: true })
+      setAdding(null)
+      setNewCatalog('')
+    } catch {
+      toast.error('No se pudo agregar al catálogo.')
+    }
+  }
+
   async function submit(data: ProcessFormData) {
     try {
       if (finalStatus && data.estado_id === finalStatus.id && !data.fecha_fin_real) data.fecha_fin_real = todayIso()
+      // La "Próxima acción" es un checklist: guardamos los pasos y el avance se calcula solo.
+      if (flujo.length) {
+        data.flujo = flujo
+        data.proxima_accion = stepsToText(flujo)
+        data.porcentaje_avance = Math.round((flujo.filter((step) => step.hecho).length / flujo.length) * 100)
+      } else {
+        data.flujo = []
+      }
       const saved = await saveProcess(data, process)
       if (!process && initialComment.trim() && saved) {
         try { await addComment(saved.id, initialComment) } catch { /* el trámite ya se creó; el comentario es opcional */ }
@@ -92,8 +121,18 @@ export function ProcessForm({ process, onClose }: { process?: Process; onClose: 
       <div className="modal-header"><div><p className="eyebrow">Registro institucional</p><h2>{process ? 'Editar trámite' : 'Nuevo trámite'}</h2></div><button onClick={onClose}><X /></button></div>
       <form onSubmit={form.handleSubmit(submit, showValidationHelp)}>
         <div className="form-grid">
-          <Field label="Área responsable *" error={form.formState.errors.area_id?.message}><Select {...form.register('area_id')}><option value="">Seleccionar…</option>{areas.map((item) => <option key={item.id} value={item.id}>{repairMojibake(item.nombre)}</option>)}</Select></Field>
-          <Field label="Tipo de trámite *" error={form.formState.errors.tipo_proceso_id?.message}><Select {...form.register('tipo_proceso_id')}><option value="">Seleccionar…</option>{processTypes.map((item) => <option key={item.id} value={item.id}>{repairMojibake(item.nombre)}</option>)}</Select></Field>
+          <Field label="Área responsable *" error={form.formState.errors.area_id?.message}>
+            <Select {...form.register('area_id')}><option value="">Seleccionar…</option>{areas.map((item) => <option key={item.id} value={item.id}>{repairMojibake(item.nombre)}</option>)}</Select>
+            {adding === 'areas'
+              ? <div className="catalog-add-row"><Input autoFocus value={newCatalog} onChange={(event) => setNewCatalog(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void createCatalog('areas', 'area_id') } }} placeholder="Nombre del área…" /><button type="button" className="button button-secondary" onClick={() => void createCatalog('areas', 'area_id')}>Guardar</button><button type="button" className="catalog-add-link" onClick={() => { setAdding(null); setNewCatalog('') }}>Cancelar</button></div>
+              : <button type="button" className="catalog-add-link" onClick={() => { setAdding('areas'); setNewCatalog('') }}><Plus size={13} /> Agregar área</button>}
+          </Field>
+          <Field label="Tipo de trámite *" error={form.formState.errors.tipo_proceso_id?.message}>
+            <Select {...form.register('tipo_proceso_id')}><option value="">Seleccionar…</option>{processTypes.map((item) => <option key={item.id} value={item.id}>{repairMojibake(item.nombre)}</option>)}</Select>
+            {adding === 'processTypes'
+              ? <div className="catalog-add-row"><Input autoFocus value={newCatalog} onChange={(event) => setNewCatalog(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void createCatalog('processTypes', 'tipo_proceso_id') } }} placeholder="Nombre del tipo…" /><button type="button" className="button button-secondary" onClick={() => void createCatalog('processTypes', 'tipo_proceso_id')}>Guardar</button><button type="button" className="catalog-add-link" onClick={() => { setAdding(null); setNewCatalog('') }}>Cancelar</button></div>
+              : <button type="button" className="catalog-add-link" onClick={() => { setAdding('processTypes'); setNewCatalog('') }}><Plus size={13} /> Agregar tipo</button>}
+          </Field>
           <Field label="Nombre del trámite *" className="span-2" error={form.formState.errors.nombre_proceso?.message}><Input {...form.register('nombre_proceso')} /></Field>
           <Field label="Responsable principal *" error={form.formState.errors.responsable_principal?.message}><Input {...form.register('responsable_principal')} /></Field>
           <Field label="Responsable secundario"><Input {...form.register('responsable_secundario')} /></Field>
@@ -103,13 +142,13 @@ export function ProcessForm({ process, onClose }: { process?: Process; onClose: 
           <Field label="Próxima revisión"><Input type="date" {...form.register('fecha_proxima_revision')} /></Field>
           <Field label="Estado" error={form.formState.errors.estado_id?.message}><Select {...form.register('estado_id')}><option value="">Seleccionar…</option>{statuses.map((item) => <option key={item.id} value={item.id}>{repairMojibake(item.nombre)}</option>)}</Select></Field>
           <Field label="Prioridad" error={form.formState.errors.prioridad_id?.message}><Select {...form.register('prioridad_id')}><option value="">Seleccionar…</option>{priorities.map((item) => <option key={item.id} value={item.id}>{repairMojibake(item.nombre)}</option>)}</Select></Field>
-          <Field label={`Avance · ${progress}%`} className="span-2" error={form.formState.errors.porcentaje_avance?.message}><Input type="range" min="0" max="100" {...form.register('porcentaje_avance', { valueAsNumber: true })} /></Field>
+          {flujo.length === 0 && <Field label={`Avance · ${progress}%`} className="span-2" error={form.formState.errors.porcentaje_avance?.message}><Input type="range" min="0" max="100" {...form.register('porcentaje_avance', { valueAsNumber: true })} /></Field>}
           <Field label="Nro. trámite eGob / eDoc"><Input placeholder="Ej. 970395" {...form.register('egob_numero')} /></Field>
           <Field label="URL eGob / eDoc"><Input placeholder="https://egobedoc.gadmriobamba.gob.ec:8081/issues/970395" {...form.register('egob_url')} /></Field>
           <Field label="Estado eGob"><Input placeholder="Ej. Nuevo, Reasignado, Archivado" {...form.register('egob_estado')} /></Field>
           <Field label="Actualmente con"><Input placeholder="Persona o unidad responsable en eGob" {...form.register('egob_responsable_actual')} /></Field>
           <Field label="Último movimiento eGob"><Input placeholder="Ej. 2026-06-08 16:04" {...form.register('egob_ultimo_movimiento')} /></Field>
-          <Field label="Próxima acción" className="span-2"><Textarea {...form.register('proxima_accion')} /></Field>
+          <div className="span-2"><FlujoEditor flujo={flujo} onChange={setFlujo} /></div>
           <Field label="Objetivo" className="span-2"><Textarea {...form.register('objetivo')} /></Field>
           <Field label="Observaciones" className="span-2"><Textarea {...form.register('observaciones')} /></Field>
           {!process && <Field label="Comentario interno (opcional)" className="span-2"><Textarea value={initialComment} onChange={(event) => setInitialComment(event.target.value)} placeholder="Deja un comentario inicial para este trámite…" /></Field>}
