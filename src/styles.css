@@ -546,3 +546,5 @@ main { padding:30px 34px 48px;max-width:1600px;margin:auto; }
 .flujo-add .field { flex:1; }
 .flujo-add .button { white-space:nowrap; }
 .flujo-hint { font-size:10px; color:var(--muted); }
+
+.row-actions .review-done { color: var(--teal); }

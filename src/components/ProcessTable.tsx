@@ -1,6 +1,6 @@
 ﻿import { useMemo, useState } from 'react'
 import { createColumnHelper, flexRender, getCoreRowModel, getFilteredRowModel, getSortedRowModel, useReactTable, type SortingState } from '@tanstack/react-table'
-import { ArrowUpDown, ExternalLink, MoreHorizontal, Pencil, Search, Trash2 } from 'lucide-react'
+import { ArrowUpDown, CheckCircle2, ExternalLink, MoreHorizontal, Pencil, Search, Trash2 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 import type { Process } from '../types'
 import { Badge, Button, Input, Select } from './ui'
@@ -29,7 +29,7 @@ function isDueForReview(process: Process) {
 }
 
 export function ProcessTable({ onEdit, view = 'active', processesOverride }: ProcessTableProps) {
-  const { processes, deleteProcess, statuses, areas, role, userEmail, globalSearch, setGlobalSearch } = useApp()
+  const { processes, deleteProcess, markReviewed, statuses, areas, role, userEmail, globalSearch, setGlobalSearch } = useApp()
   const sourceProcesses = processesOverride ?? processes
   const [sorting, setSorting] = useState<SortingState>([])
   const [status, setStatus] = useState('')
@@ -75,8 +75,8 @@ export function ProcessTable({ onEdit, view = 'active', processesOverride }: Pro
       const issueUrl = getEgobIssueUrl(row.original)
       return issueUrl ? <a className="egob-link" href={issueUrl} target="_blank" rel="noreferrer" title={`Abrir trámite eGob ${issueNumber}`}><ExternalLink size={14} /> {issueNumber}</a> : <span className="muted-cell">—</span>
     } }),
-    helper.display({ id: 'actions', cell: ({ row }) => <div className="row-actions">{canEditProcesses(role, userEmail) && <button onClick={() => onEdit(row.original)} title="Editar"><Pencil size={16} /></button>}{role === 'admin' && <button onClick={() => confirm('¿Archivar este trámite?') && void deleteProcess(row.original.id)} title="Archivar"><Trash2 size={16} /></button>}<button title="Más acciones"><MoreHorizontal size={17} /></button></div> }),
-  ], [navigate, onEdit, deleteProcess, role, userEmail])
+    helper.display({ id: 'actions', cell: ({ row }) => <div className="row-actions">{canEditProcesses(role, userEmail) && row.original.fecha_proxima_revision && <button className="review-done" onClick={() => void markReviewed(row.original.id)} title="Marcar como revisado (lo saca de Pendientes)"><CheckCircle2 size={16} /></button>}{canEditProcesses(role, userEmail) && <button onClick={() => onEdit(row.original)} title="Editar"><Pencil size={16} /></button>}{role === 'admin' && <button onClick={() => confirm('¿Archivar este trámite?') && void deleteProcess(row.original.id)} title="Archivar"><Trash2 size={16} /></button>}<button title="Más acciones"><MoreHorizontal size={17} /></button></div> }),
+  ], [navigate, onEdit, deleteProcess, markReviewed, role, userEmail])
   const table = useReactTable({
     data: filtered, columns, state: { sorting },
     onSortingChange: setSorting,

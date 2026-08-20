@@ -25,6 +25,7 @@ interface AppState {
   setGlobalSearch: (value: string) => void
   saveProcess: (data: ProcessFormData, current?: Process) => Promise<Process | undefined>
   deleteProcess: (id: string) => Promise<void>
+  markReviewed: (id: string) => Promise<void>
   addComment: (processId: string, contenido: string) => Promise<void>
   deleteComment: (id: string) => Promise<void>
   uploadAttachment: (processId: string, file: File) => Promise<void>
@@ -250,6 +251,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
     toast.success('Trámite archivado')
   }
 
+  async function markReviewed(id: string) {
+    if (supabase) {
+      const { error } = await supabase.from('processes').update({ fecha_proxima_revision: null, updated_at: new Date().toISOString() }).eq('id', id)
+      if (error) throw error
+    }
+    setProcesses((old) => old.map((item) => item.id === id ? { ...item, fecha_proxima_revision: undefined } : item))
+    toast.success('Trámite marcado como revisado')
+  }
+
   async function addComment(processId: string, contenido: string) {
     const cleanContent = repairMojibake(contenido).trim()
     if (!cleanContent) return
@@ -418,7 +428,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const value = useMemo(() => ({
     processes, areas, processTypes, statuses, priorities, logs, comments, attachments, loading,
     demoMode: !isSupabaseConfigured, role, userName, userEmail, userAreaName, canAccessManagement, globalSearch, setGlobalSearch,
-    saveProcess, deleteProcess, addComment, deleteComment, uploadAttachment, deleteAttachment, openAttachment, importProcesses, addCatalogItem, updateCatalogItem, deleteCatalogItem,
+    saveProcess, deleteProcess, markReviewed, addComment, deleteComment, uploadAttachment, deleteAttachment, openAttachment, importProcesses, addCatalogItem, updateCatalogItem, deleteCatalogItem,
   }), [processes, areas, processTypes, statuses, priorities, logs, comments, attachments, loading, role, userName, userEmail, userAreaName, canAccessManagement, globalSearch])
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
