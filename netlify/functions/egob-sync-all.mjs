@@ -73,6 +73,14 @@ export function computeEgobUpdate(process, egob, nowIso = new Date().toISOString
     hasChanges = true
   }
 
+  // Trámite(s) madre (tarea padre en eGob): solo la cadena de padres, sin hijos ni insistos.
+  const madreNew = Array.isArray(egob.tramites_madre) ? egob.tramites_madre.map(String) : []
+  const madreOld = Array.isArray(process.egob_tramites_madre) ? process.egob_tramites_madre.map(String) : []
+  if (JSON.stringify([...madreNew].sort()) !== JSON.stringify([...madreOld].sort())) {
+    payload.egob_tramites_madre = madreNew
+    hasChanges = true
+  }
+
   if (!hasChanges) return null
 
   // Una unica notificacion por movimiento: la fila representativa de mayor prioridad.
@@ -95,7 +103,7 @@ export default async function scheduledEgobSync() {
   const supabase = getSupabaseAdmin()
   const { data: processes, error } = await supabase
     .from('processes')
-    .select('id,codigo_proceso,nombre_proceso,documento_respaldo,egob_numero,egob_url,egob_estado,egob_responsable_actual,egob_responsable_cargo,egob_ultimo_movimiento,egob_sincronizado_en,egob_tramites_relacionados')
+    .select('id,codigo_proceso,nombre_proceso,documento_respaldo,egob_numero,egob_url,egob_estado,egob_responsable_actual,egob_responsable_cargo,egob_ultimo_movimiento,egob_sincronizado_en,egob_tramites_relacionados,egob_tramites_madre')
     .eq('activo', true)
     .or('egob_numero.not.is.null,documento_respaldo.not.is.null')
 
@@ -146,9 +154,9 @@ export default async function scheduledEgobSync() {
 
       // Si alguna columna aun no existe en la BD (migracion no aplicada), reintenta sin esas
       // columnas en vez de fallar (la sincronizacion sigue funcionando).
-      if (updateError && /egob_sincronizado_en|egob_tramites_relacionados/.test(String(updateError.message || ''))) {
-        const { egob_sincronizado_en, egob_tramites_relacionados, ...rest } = result.payload
-        void egob_sincronizado_en; void egob_tramites_relacionados
+      if (updateError && /egob_sincronizado_en|egob_tramites_relacionados|egob_tramites_madre/.test(String(updateError.message || ''))) {
+        const { egob_sincronizado_en, egob_tramites_relacionados, egob_tramites_madre, ...rest } = result.payload
+        void egob_sincronizado_en; void egob_tramites_relacionados; void egob_tramites_madre
         ;({ error: updateError } = await supabase.from('processes').update(rest).eq('id', process.id))
       }
 

@@ -348,6 +348,8 @@ function parseIssue(issue, html, finalUrl) {
     .map((item) => item[1])
     .filter((value, index, array) => array.indexOf(value) === index && value !== issue)
 
+  const madre = parseParents(html, issue)
+
   const responsable = latestOwner?.responsable || ''
   const ultimoMovimiento = formatMovement(latestMovement, issue)
     || latestAttachment
@@ -367,8 +369,20 @@ function parseIssue(issue, html, finalUrl) {
     _movement: latestMovement,
     _owner: latestOwner,
     tramites_hijos: children,
+    tramites_madre: madre,
     sincronizado_en: new Date().toISOString(),
   }
+}
+
+// Trámite(s) madre: la "Tarea padre" (parent) y la raíz del árbol en eGob/Redmine.
+// eGob incrusta en el HTML: parent_issue_id / parent_id / root_id. Excluye el propio issue.
+function parseParents(html, issue) {
+  const madre = new Set()
+  const add = (value) => { const n = String(value || '').replace(/\D/g, ''); if (n && n !== String(issue)) madre.add(n) }
+  add(html.match(/root_id:\s*["']?(\d{5,})/i)?.[1])
+  add(html.match(/parent_issue_id:\s*["']?(\d{5,})/i)?.[1])
+  add(html.match(/parent_id:\s*["']?(\d{5,})/i)?.[1])
+  return [...madre]
 }
 
 // Combina la cadena madre + hijos escogiendo el movimiento realmente mas reciente de TODA la cadena.
@@ -499,6 +513,7 @@ export async function loginAndReadIssue(issue) {
           ultimo_movimiento: rec.ultimo_movimiento || base.ultimo_movimiento,
           actualizado_en: rec.actualizado_en || base.actualizado_en,
           tramites_hijos: base.tramites_hijos,
+          tramites_madre: base.tramites_madre,
           tramites_revisados: [issue],
           tramites_relacionados: extractRelated(text, base.tramites_hijos, issue),
           fuente: 'recorrido_pdf',
@@ -512,6 +527,7 @@ export async function loginAndReadIssue(issue) {
 
   const relatedIssues = await readRelatedIssues(jar, issue, base.tramites_hijos)
   const merged = mergeIssueChain(base, relatedIssues)
+  merged.tramites_madre = base.tramites_madre
   merged.tramites_relacionados = [...new Set([...(merged.tramites_revisados || []), ...(merged.tramites_hijos || [])])]
     .map((value) => String(value).replace(/\D/g, ''))
     .filter((value) => value && value !== String(issue))
@@ -878,4 +894,5 @@ export const __test__ = {
   splitDePara,
   parseHojaDeRuta,
   resolveRecorrido,
+  parseParents,
 }

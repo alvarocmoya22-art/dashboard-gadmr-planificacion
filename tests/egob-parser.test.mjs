@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { __test__ } from '../netlify/functions/egob-sync.mjs'
 import { computeEgobUpdate } from '../netlify/functions/egob-sync-all.mjs'
 
-const { parseIssue, mergeIssueChain, extractMovements, stripText, canonicalName } = __test__
+const { parseIssue, mergeIssueChain, extractMovements, stripText, canonicalName, parseParents } = __test__
 
 // --- Reordenamiento de nombres del PDF (apellidos primero -> nombres primero) ---------
 test('0. canonicalName reordena apellidos->nombres (incluye apellidos compuestos)', () => {
@@ -177,4 +177,22 @@ test('8. No borra un responsable válido con un valor vacío', () => {
   }
   const egob = { issue: '914830', responsable_actual: '', ultimo_movimiento: '', estado: '' }
   assert.equal(computeEgobUpdate(process, egob), null)
+})
+
+// --- Trámite madre (Tarea padre en eGob/Redmine) -------------------------------------
+test('9. parseParents extrae la madre (parent/root) y excluye el propio trámite', () => {
+  // Un hijo: parent_issue_id y root_id apuntan a la madre 1013958.
+  const hijo = 'author_id: author_id, parent_issue_id: "1013958", parent_id: 1013958, root_id: 1013958, lft: 4'
+  assert.deepEqual(parseParents(hijo, '1049194'), ['1013958'])
+
+  // La propia madre: sin padre; root_id es ella misma -> lista vacía (no se muestra a sí misma).
+  const madre = 'parent_issue_id: "", parent_id: nil, root_id: 1013958, lft: 1'
+  assert.deepEqual(parseParents(madre, '1013958'), [])
+})
+
+test('10. computeEgobUpdate persiste egob_tramites_madre cuando cambia', () => {
+  const process = { egob_numero: '1049194', egob_tramites_madre: [] }
+  const egob = { issue: '1049194', tramites_madre: ['1013958'] }
+  const result = computeEgobUpdate(process, egob)
+  assert.deepEqual(result.payload.egob_tramites_madre, ['1013958'])
 })
