@@ -1,5 +1,5 @@
 ﻿import { useMemo, useState } from 'react'
-import { AlertTriangle, ArrowRight, BriefcaseBusiness, CalendarClock, CheckCircle2, CircleGauge, ExternalLink, FileText, Flag, Layers3, Paperclip, Search } from 'lucide-react'
+import { AlertTriangle, ArrowRight, BriefcaseBusiness, CalendarClock, CheckCircle2, CircleGauge, ExternalLink, FileText, Layers3, Paperclip, Search } from 'lucide-react'
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 import { Link } from 'react-router-dom'
 import { Card, Badge } from '../components/ui'
@@ -110,23 +110,8 @@ export function Dashboard() {
     { label: 'Avance general', value: `${metrics.average}%`, note: 'Promedio institucional', icon: CircleGauge, tone: 'purple' },
   ]
 
-  const directorSignals = [
-    { label: 'Comentarios internos', value: comments.length, detail: 'Ver trámites con notas cargadas por el equipo', to: '/procesos?comentarios=1' },
-  ]
   return <div className="dashboard-grid">
     <section className="kpi-grid">{kpis.map(({ label, value, note, icon: Icon, tone }) => <Card className={`kpi-card tone-${tone}`} key={label}><div className="kpi-icon"><Icon size={20} /></div><div><span>{repairMojibake(label)}</span><strong>{value}</strong><small>{repairMojibake(note)}</small></div></Card>)}</section>
-    <section className="attention-banner">
-      <div className="attention-icon"><Flag size={22} /></div>
-      <div><p className="eyebrow">Qué requiere atención hoy</p><h2>{metrics.overdue.length || metrics.expiring.length ? `${metrics.overdue.length + metrics.expiring.length} trámites necesitan seguimiento cercano` : 'La operación está bajo control'}</h2><p>Priorizamos vencimientos, alta prioridad y solicitudes explícitas de acción gerencial.</p></div>
-      <Link to="/alertas">Revisar alertas <ArrowRight size={17} /></Link>
-    </section>
-    <section className="director-summary-grid director-summary-grid-compact">
-      {directorSignals.map((item) => <Link className="director-summary-card director-summary-card-link" key={item.label} to={item.to}>
-        <span>{repairMojibake(item.label)}</span>
-        <strong>{item.value}</strong>
-        <small>{repairMojibake(item.detail)}</small>
-      </Link>)}
-    </section>
     <section className="portfolio-composition-section">
       <Card className="chart-card portfolio-composition-card">
         <div className="card-heading"><div><p className="eyebrow">Composición</p><h3>Distribución del portafolio</h3></div><Layers3 size={20} /></div>
