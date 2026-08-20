@@ -185,12 +185,17 @@ function parseRoleForAssignee(text, assignee) {
   if (!assignee) return ''
   const namePattern = escapeRegExp(assignee).replace(/\s+/g, '\\s+')
   const re = new RegExp(`${namePattern}\\s*\\(([^)\\n]{4,120})\\)`, 'gi')
+  // El cargo real de la persona se repite en el flujo; se toma el MÁS FRECUENTE (no el primero).
+  const counts = new Map()
   for (const match of text.matchAll(re)) {
     const cargo = repairMojibake(match[1]).replace(/\s+/g, ' ').trim()
-    // El cargo debe tener letras (evita capturar numeros de tramite como "( 1131364 )").
-    if (/[A-Za-zÁÉÍÓÚÑ]/.test(cargo) && !/^[\d\s]+$/.test(cargo)) return cargo
+    if (!/[A-Za-zÁÉÍÓÚÑ]/.test(cargo) || /^[\d\s]+$/.test(cargo)) continue
+    counts.set(cargo, (counts.get(cargo) || 0) + 1)
   }
-  return ''
+  let best = ''
+  let bestN = 0
+  for (const [cargo, n] of counts) { if (n > bestN) { best = cargo; bestN = n } }
+  return best
 }
 
 function matchBetween(text, start, end) {

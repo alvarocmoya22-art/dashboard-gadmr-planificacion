@@ -23,7 +23,7 @@ interface AppState {
   canAccessManagement: boolean
   globalSearch: string
   setGlobalSearch: (value: string) => void
-  saveProcess: (data: ProcessFormData, current?: Process) => Promise<void>
+  saveProcess: (data: ProcessFormData, current?: Process) => Promise<Process | undefined>
   deleteProcess: (id: string) => Promise<void>
   addComment: (processId: string, contenido: string) => Promise<void>
   deleteComment: (id: string) => Promise<void>
@@ -205,12 +205,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
         ? await supabase.from('processes').update(payload).eq('id', current.id).select('*, area:areas(*), tipo:process_types(*), estado:process_statuses(*), prioridad:priorities(*)').single()
         : await supabase.from('processes').insert(payload).select('*, area:areas(*), tipo:process_types(*), estado:process_statuses(*), prioridad:priorities(*)').single()
       if (response.error) throw response.error
+      let saved: Process | undefined
       if (response.data) {
-        const full = deriveProcess(response.data)
+        saved = deriveProcess(response.data)
+        const full = saved
         setProcesses((old) => current ? old.map((item) => item.id === current.id ? full : item) : [full, ...old])
       }
       toast.success(current ? 'Trámite actualizado' : 'Trámite creado')
-      return
+      return saved
     }
     const now = new Date().toISOString()
     const base: Process = {
@@ -236,6 +238,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
     const full = hydrate(base, areas, processTypes, statuses, priorities)
     setProcesses((old) => current ? old.map((item) => item.id === current.id ? full : item) : [full, ...old])
     toast.success(current ? 'Trámite actualizado' : 'Trámite creado')
+    return full
   }
 
   async function deleteProcess(id: string) {

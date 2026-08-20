@@ -1,4 +1,4 @@
-﻿import { useEffect } from 'react'
+﻿import { useEffect, useState } from 'react'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
@@ -39,7 +39,8 @@ const schema = z.object({
 })
 
 export function ProcessForm({ process, onClose }: { process?: Process; onClose: () => void }) {
-  const { areas, processTypes, statuses, priorities, saveProcess } = useApp()
+  const { areas, processTypes, statuses, priorities, saveProcess, addComment } = useApp()
+  const [initialComment, setInitialComment] = useState('')
   const form = useForm<ProcessFormData>({
     resolver: zodResolver(schema),
     defaultValues: {
@@ -71,7 +72,10 @@ export function ProcessForm({ process, onClose }: { process?: Process; onClose: 
   async function submit(data: ProcessFormData) {
     try {
       if (finalStatus && data.estado_id === finalStatus.id && !data.fecha_fin_real) data.fecha_fin_real = todayIso()
-      await saveProcess(data, process)
+      const saved = await saveProcess(data, process)
+      if (!process && initialComment.trim() && saved) {
+        try { await addComment(saved.id, initialComment) } catch { /* el trámite ya se creó; el comentario es opcional */ }
+      }
       onClose()
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'No se pudo guardar el trámite.')
@@ -108,6 +112,7 @@ export function ProcessForm({ process, onClose }: { process?: Process; onClose: 
           <Field label="Próxima acción" className="span-2"><Textarea {...form.register('proxima_accion')} /></Field>
           <Field label="Objetivo" className="span-2"><Textarea {...form.register('objetivo')} /></Field>
           <Field label="Observaciones" className="span-2"><Textarea {...form.register('observaciones')} /></Field>
+          {!process && <Field label="Comentario interno (opcional)" className="span-2"><Textarea value={initialComment} onChange={(event) => setInitialComment(event.target.value)} placeholder="Deja un comentario inicial para este trámite…" /></Field>}
         </div>
         <div className="modal-actions"><Button type="button" variant="ghost" onClick={onClose}>Cancelar</Button><Button type="submit" disabled={form.formState.isSubmitting}>{process ? 'Guardar cambios' : 'Crear trámite'}</Button></div>
       </form>

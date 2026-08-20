@@ -144,17 +144,14 @@ export function Dashboard() {
               <small>{Math.round((item.value / Math.max(processes.length, 1)) * 100)}% del portafolio</small>
             </article>)}</div>
           </div>
+          <div className="portfolio-type-panel">
+            <div className="subchart-heading"><strong>Por tipo de proyecto</strong><span>Distribución por tipo de trámite</span></div>
+            <div className="priority-bars type-panel-bars">{typeData.map((item) => <article className="priority-row" key={item.name}>
+              <div className="priority-row-copy"><span><i style={{ background: item.color }} />{repairMojibake(item.name)}</span><strong>{item.value}</strong></div>
+              <div className="priority-track"><i style={{ width: `${Math.max((item.value / typeMax) * 100, 4)}%`, background: item.color }} /></div>
+            </article>)}</div>
+          </div>
         </div>
-      </Card>
-    </section>
-    <section className="type-kpi-section">
-      <Card className="chart-card type-kpi-card">
-        <div className="card-heading"><div><p className="eyebrow">Composición</p><h3>Trámites por tipo de proyecto</h3></div><Layers3 size={20} /></div>
-        <div className="priority-bars type-bars">{typeData.map((item) => <article className="priority-row" key={item.name}>
-          <div className="priority-row-copy"><span><i style={{ background: item.color }} />{repairMojibake(item.name)}</span><strong>{item.value}</strong></div>
-          <div className="priority-track"><i style={{ width: `${Math.max((item.value / typeMax) * 100, 4)}%`, background: item.color }} /></div>
-          <small>{Math.round((item.value / Math.max(processes.length, 1)) * 100)}% del portafolio</small>
-        </article>)}</div>
       </Card>
     </section>
     <section className="critical-section">

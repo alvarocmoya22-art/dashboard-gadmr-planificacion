@@ -19,8 +19,8 @@ export function Operativa() {
   return <div>
     <div className="page-actions">
       <div className="view-tabs">
-        <button className={view === 'active' ? 'active' : ''} onClick={() => setView('active')}>Trámites activos</button>
         <button className={view === 'review' ? 'active' : ''} onClick={() => setView('review')}><SlidersHorizontal size={15} /> Pendientes de revisión</button>
+        <button className={view === 'active' ? 'active' : ''} onClick={() => setView('active')}>Trámites activos</button>
       </div>
       {canCreate && <Button onClick={() => setFormProcess(null)}><Plus size={17} /> Nuevo trámite</Button>}
     </div>
