@@ -1,4 +1,4 @@
-﻿import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+﻿import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { areas as demoAreas, demoProcesses, priorities as demoPriorities, processTypes as demoTypes, statuses as demoStatuses } from '../data/tramites'
 import { deriveProcess, repairMojibake, uid } from '../lib/utils'
@@ -86,6 +86,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [userEmail, setUserEmail] = useState('')
   const [userAreaId, setUserAreaId] = useState<string | null>(null)
   const [globalSearch, setGlobalSearch] = useState('')
+  // Mapa id -> nombre para resolver el autor de comentarios/adjuntos (profiles es legible por todos).
+  const profilesRef = useRef<Map<string, string>>(new Map())
+  const authUserIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     async function load() {
@@ -98,12 +101,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
       }
       const { data: authData } = await supabase.auth.getUser()
       if (authData.user) {
+        authUserIdRef.current = authData.user.id
         const { data: profile } = await supabase.from('profiles').select('nombre_completo, role, area_id').eq('id', authData.user.id).single()
         setUserEmail(authData.user.email ?? '')
         setUserName(profile?.nombre_completo || authData.user.email || 'Usuario institucional')
         if (profile?.role) setRole(profile.role as Role)
         if (profile?.area_id) setUserAreaId(profile.area_id)
       }
+      // Directorio de nombres para mostrar quién dejó cada comentario/adjunto.
+      const { data: allProfiles } = await supabase.from('profiles').select('id, nombre_completo')
+      const nameMap = new Map<string, string>()
+      for (const p of allProfiles ?? []) if (p.id) nameMap.set(p.id, repairMojibake(p.nombre_completo || '') || 'Usuario institucional')
+      profilesRef.current = nameMap
       const [areaResult, typeResult, statusResult, priorityResult] = await Promise.all([
         supabase.from('areas').select('*').eq('activo', true).order('nombre'),
         supabase.from('process_types').select('*').eq('activo', true).order('nombre'),
@@ -131,7 +140,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setComments((commentResult.data ?? []).map((item) => ({
           ...item,
           contenido: repairMojibake(item.contenido),
-          usuario: 'Usuario institucional',
+          usuario: profilesRef.current.get(item.created_by ?? '') || 'Usuario institucional',
         })))
       }
       const attachmentResult = await supabase
@@ -143,7 +152,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         setAttachments((attachmentResult.data ?? []).map((item) => ({
           ...item,
           nombre_archivo: repairMojibake(item.nombre_archivo),
-          usuario: 'Usuario institucional',
+          usuario: profilesRef.current.get(item.created_by ?? '') || 'Usuario institucional',
         })))
       }
       setLoading(false)
@@ -164,13 +173,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (log.campo === 'estado_id') toast.info('Un trámite cambió de estado. Revisa la campana de notificaciones.')
     }).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'process_comments' }, (payload) => {
       const comment = payload.new as ProcessComment
-      setComments((old) => [{ ...comment, contenido: repairMojibake(comment.contenido), usuario: 'Usuario institucional' }, ...old].slice(0, 200))
+      const usuario = profilesRef.current.get(comment.created_by ?? '')
+        || (comment.created_by === authUserIdRef.current ? userName : 'Usuario institucional')
+      setComments((old) => old.some((item) => item.id === comment.id)
+        ? old
+        : [{ ...comment, contenido: repairMojibake(comment.contenido), usuario }, ...old].slice(0, 200))
     }).on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'process_comments' }, (payload) => {
       const comment = payload.old as ProcessComment
       setComments((old) => old.filter((item) => item.id !== comment.id))
     }).on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'process_attachments' }, (payload) => {
       const attachment = payload.new as ProcessAttachment
-      setAttachments((old) => [{ ...attachment, nombre_archivo: repairMojibake(attachment.nombre_archivo), usuario: 'Usuario institucional' }, ...old].slice(0, 300))
+      const usuario = profilesRef.current.get(attachment.created_by ?? '')
+        || (attachment.created_by === authUserIdRef.current ? userName : 'Usuario institucional')
+      setAttachments((old) => old.some((item) => item.id === attachment.id)
+        ? old
+        : [{ ...attachment, nombre_archivo: repairMojibake(attachment.nombre_archivo), usuario }, ...old].slice(0, 300))
     }).on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'process_attachments' }, (payload) => {
       const attachment = payload.old as ProcessAttachment
       setAttachments((old) => old.filter((item) => item.id !== attachment.id))
