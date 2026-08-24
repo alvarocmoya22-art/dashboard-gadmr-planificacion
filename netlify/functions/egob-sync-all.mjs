@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { loginAndReadIssue, nameKey, readCargoDirectory } from './egob-sync.mjs'
+import { loginAndReadIssue, nameKey, readCargoDirectory, readMadreDetalle } from './egob-sync.mjs'
 
 const headers = {
   'content-type': 'application/json; charset=utf-8',
@@ -90,6 +90,16 @@ export function computeEgobUpdate(process, egob, nowIso = new Date().toISOString
     hasChanges = true
   }
 
+  // Detalle de la(s) madre(s): Asunto / Remitente / Destinatario / Fecha.
+  if (Array.isArray(egob.madre_detalle)) {
+    const detNew = JSON.stringify(egob.madre_detalle)
+    const detOld = JSON.stringify(Array.isArray(process.egob_madre_detalle) ? process.egob_madre_detalle : [])
+    if (detNew !== detOld) {
+      payload.egob_madre_detalle = egob.madre_detalle
+      hasChanges = true
+    }
+  }
+
   if (!hasChanges) return null
 
   // Una unica notificacion por movimiento: la fila representativa de mayor prioridad.
@@ -112,7 +122,7 @@ export default async function scheduledEgobSync() {
   const supabase = getSupabaseAdmin()
   const { data: processes, error } = await supabase
     .from('processes')
-    .select('id,codigo_proceso,nombre_proceso,documento_respaldo,egob_numero,egob_url,egob_estado,egob_responsable_actual,egob_responsable_cargo,egob_ultimo_movimiento,egob_sincronizado_en,egob_tramites_relacionados,egob_tramites_madre')
+    .select('id,codigo_proceso,nombre_proceso,documento_respaldo,egob_numero,egob_url,egob_estado,egob_responsable_actual,egob_responsable_cargo,egob_ultimo_movimiento,egob_sincronizado_en,egob_tramites_relacionados,egob_tramites_madre,egob_madre_detalle')
     .eq('activo', true)
     .or('egob_numero.not.is.null,documento_respaldo.not.is.null')
 
@@ -173,12 +183,26 @@ export default async function scheduledEgobSync() {
     }
   }
 
-  // PASE 2: completar el cargo faltante con el directorio y escribir los cambios.
+  // PASE 2: completar el cargo faltante con el directorio, resolver el detalle de la madre
+  // y escribir los cambios.
+  const madreCache = new Map() // issue -> {issue,asunto,remitente,destinatario,fecha}
   for (const { process, issue, egob } of pending) {
     try {
       if (!clean(egob.responsable_cargo)) {
         const hit = cargoDir.get(nameKey(egob.responsable_actual))
         if (hit?.cargo) egob.responsable_cargo = hit.cargo
+      }
+      // Detalle de la(s) madre(s) para mostrar en el frontend.
+      if (Array.isArray(egob.tramites_madre) && egob.tramites_madre.length) {
+        const detalle = []
+        for (const madre of egob.tramites_madre) {
+          const key = String(madre)
+          if (!madreCache.has(key)) madreCache.set(key, await readMadreDetalle(key))
+          detalle.push(madreCache.get(key))
+        }
+        egob.madre_detalle = detalle
+      } else {
+        egob.madre_detalle = []
       }
       const result = computeEgobUpdate(process, egob)
 
@@ -206,9 +230,9 @@ export default async function scheduledEgobSync() {
 
       // Si alguna columna aun no existe en la BD (migracion no aplicada), reintenta sin esas
       // columnas en vez de fallar (la sincronizacion sigue funcionando).
-      if (updateError && /egob_sincronizado_en|egob_tramites_relacionados|egob_tramites_madre/.test(String(updateError.message || ''))) {
-        const { egob_sincronizado_en, egob_tramites_relacionados, egob_tramites_madre, ...rest } = result.payload
-        void egob_sincronizado_en; void egob_tramites_relacionados; void egob_tramites_madre
+      if (updateError && /egob_sincronizado_en|egob_tramites_relacionados|egob_tramites_madre|egob_madre_detalle/.test(String(updateError.message || ''))) {
+        const { egob_sincronizado_en, egob_tramites_relacionados, egob_tramites_madre, egob_madre_detalle, ...rest } = result.payload
+        void egob_sincronizado_en; void egob_tramites_relacionados; void egob_tramites_madre; void egob_madre_detalle
         ;({ error: updateError } = await supabase.from('processes').update(rest).eq('id', process.id))
       }
 

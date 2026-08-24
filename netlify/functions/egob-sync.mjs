@@ -936,6 +936,29 @@ export async function handler(event) {
   }
 }
 
+// Detalle de un trámite (para mostrar la madre en el frontend): Asunto, Remitente (creador),
+// Destinatario (responsable actual) y Fecha de registro.
+export async function readMadreDetalle(issue) {
+  const num = String(issue).replace(/\D/g, '')
+  try {
+    const { page } = await openSession(num)
+    const text = stripText(page.html)
+    const asunto = text.match(/Asunto:\s*(.+?)\s*Creado por/i)?.[1]?.trim() || ''
+    const remitente = text.match(/Creado por\s+(.+?)\s*(?:,|\.|\s+hace\s|\s+Actualizado|\s+el\s|\s+\d{4}-\d{2}-\d{2})/i)?.[1]?.trim() || ''
+    const fecha = text.match(/Fecha registro:\s*([0-9]{4}-[0-9]{2}-[0-9]{2}(?:\s+[0-9:]+\s*[AP]?\.?M?\.?)?)/i)?.[1]?.trim() || ''
+    const parsed = parseIssue(num, page.html, page.url)
+    return {
+      issue: num,
+      asunto: repairMojibake(asunto),
+      remitente: repairMojibake(remitente),
+      destinatario: repairMojibake(parsed.responsable_actual || ''),
+      fecha,
+    }
+  } catch {
+    return { issue: num, asunto: '', remitente: '', destinatario: '', fecha: '' }
+  }
+}
+
 // Directorio de cargos leido de la pagina de un issue (para la sincronizacion:
 // permite recuperar el selector institucional completo desde un hijo cuando el
 // tramite propio no lo trae). Devuelve [] si la sesion falla.

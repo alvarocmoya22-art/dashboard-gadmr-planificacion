@@ -30,6 +30,8 @@ interface AppState {
   markReviewed: (id: string) => Promise<void>
   isPendingReview: (process: Process) => boolean
   latestComment: (processId: string) => ProcessComment | undefined
+  addManualRelated: (processId: string, issue: string) => Promise<void>
+  removeManualRelated: (processId: string, issue: string) => Promise<void>
   addComment: (processId: string, contenido: string) => Promise<void>
   deleteComment: (id: string) => Promise<void>
   uploadAttachment: (processId: string, file: File) => Promise<void>
@@ -314,6 +316,27 @@ export function AppProvider({ children }: { children: ReactNode }) {
     toast.success('Marcado como revisado por hoy')
   }
 
+  // Trámites relacionados agregados a mano (además de la madre automática).
+  async function setManualRelated(processId: string, list: string[]) {
+    if (supabase) {
+      const { error } = await supabase.from('processes').update({ egob_relacionados_manual: list, updated_at: new Date().toISOString() }).eq('id', processId)
+      if (error && !/egob_relacionados_manual/.test(String(error.message || ''))) throw error
+    }
+    setProcesses((old) => old.map((p) => p.id === processId ? { ...p, egob_relacionados_manual: list } : p))
+  }
+  async function addManualRelated(processId: string, issue: string) {
+    const num = String(issue).replace(/\D/g, '')
+    if (!num) return
+    const current = processes.find((x) => x.id === processId)?.egob_relacionados_manual ?? []
+    if (current.includes(num)) { toast.info('Ese trámite ya está en la lista'); return }
+    await setManualRelated(processId, [...current, num])
+    toast.success('Trámite relacionado agregado')
+  }
+  async function removeManualRelated(processId: string, issue: string) {
+    const current = processes.find((x) => x.id === processId)?.egob_relacionados_manual ?? []
+    await setManualRelated(processId, current.filter((n) => n !== issue))
+  }
+
   async function addComment(processId: string, contenido: string) {
     const cleanContent = repairMojibake(contenido).trim()
     if (!cleanContent) return
@@ -530,7 +553,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const value = useMemo(() => ({
     processes, areas, processTypes, statuses, priorities, logs, comments, attachments, loading,
     demoMode: !isSupabaseConfigured, role, userName, userEmail, userAreaName, canAccessManagement, globalSearch, setGlobalSearch,
-    saveProcess, deleteProcess, markReviewed, isPendingReview, latestComment, addComment, deleteComment, uploadAttachment, deleteAttachment, openAttachment, importProcesses, addCatalogItem, updateCatalogItem, deleteCatalogItem,
+    saveProcess, deleteProcess, markReviewed, isPendingReview, latestComment, addManualRelated, removeManualRelated, addComment, deleteComment, uploadAttachment, deleteAttachment, openAttachment, importProcesses, addCatalogItem, updateCatalogItem, deleteCatalogItem,
   }), [processes, areas, processTypes, statuses, priorities, logs, comments, attachments, loading, role, userName, userEmail, userAreaName, canAccessManagement, globalSearch, reviewMarks, scarId, juanDiegoId])
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>

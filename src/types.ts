@@ -5,6 +5,14 @@ export interface FlujoStep {
   hecho: boolean
 }
 
+export interface MadreDetalle {
+  issue: string
+  asunto: string
+  remitente: string
+  destinatario: string
+  fecha: string
+}
+
 export interface CatalogItem {
   id: string
   nombre: string
@@ -37,6 +45,8 @@ export interface Process {
   egob_ultimo_movimiento?: string
   egob_tramites_relacionados?: string[]
   egob_tramites_madre?: string[]
+  egob_madre_detalle?: MadreDetalle[]
+  egob_relacionados_manual?: string[]
   proxima_accion?: string
   flujo?: FlujoStep[]
   objetivo?: string
