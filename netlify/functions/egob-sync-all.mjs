@@ -51,14 +51,23 @@ export function computeEgobUpdate(process, egob, nowIso = new Date().toISOString
   const payload = {}
   let hasChanges = false
 
+  // El cargo pertenece al responsable: si el responsable cambió a otra persona,
+  // el cargo anterior es de la persona previa y no debe conservarse.
+  const respPrev = clean(process.egob_responsable_actual)
+  const responsableCambio = Boolean(next.egob_responsable_actual)
+    && next.egob_responsable_actual !== respPrev
+
   for (const key of Object.keys(next)) {
     const previous = clean(process[key])
     const value = next[key]
     // Un responsable que sea una palabra de estado/prioridad (p. ej. "Urgente",
     // "Finalizado") es invalido: no debe preservarse aunque el nuevo valor sea vacio.
     const previousInvalid = key === 'egob_responsable_actual' && NON_PERSON_OWNER.test(previous)
-    // Nunca borrar un dato valido existente con vacio.
-    if (!value && previous && !previousInvalid) continue
+    // Cargo huerfano: cambio el responsable pero eGob no trajo cargo del nuevo -> limpiar,
+    // en vez de dejar el cargo del responsable anterior.
+    const cargoHuerfano = key === 'egob_responsable_cargo' && responsableCambio
+    // Nunca borrar un dato valido existente con vacio (salvo invalidos u huerfanos).
+    if (!value && previous && !previousInvalid && !cargoHuerfano) continue
     if (value !== previous) {
       payload[key] = value || null
       hasChanges = true

@@ -196,3 +196,34 @@ test('10. computeEgobUpdate persiste egob_tramites_madre cuando cambia', () => {
   const result = computeEgobUpdate(process, egob)
   assert.deepEqual(result.payload.egob_tramites_madre, ['1013958'])
 })
+
+test('11. Al cambiar el responsable sin cargo nuevo, limpia el cargo del anterior', () => {
+  const process = {
+    egob_numero: '934149',
+    egob_responsable_actual: 'MARIA ALEJANDRA BONIFAZ LÓPEZ',
+    egob_responsable_cargo: 'Jefe de Habilitación de Suelo y Edificación',
+  }
+  const egob = { issue: '934149', responsable_actual: 'DANIELA MARINA GARCIA PAREDES', responsable_cargo: '' }
+  const result = computeEgobUpdate(process, egob)
+  assert.equal(result.payload.egob_responsable_actual, 'DANIELA MARINA GARCIA PAREDES')
+  assert.equal(result.payload.egob_responsable_cargo, null) // cargo huerfano limpiado
+})
+
+test('12. Mismo responsable sin cargo nuevo: conserva el cargo (fallo transitorio)', () => {
+  const process = {
+    egob_numero: '934149',
+    egob_url: 'https://egobedoc.gadmriobamba.gob.ec:8081/issues/934149',
+    egob_responsable_actual: 'DANIELA MARINA GARCIA PAREDES',
+    egob_responsable_cargo: 'Jefe de Habilitación de Suelo y Edificación',
+    egob_ultimo_movimiento: '2026-08-21 19:07 - Archivado',
+  }
+  const egob = {
+    issue: '934149',
+    url: 'https://egobedoc.gadmriobamba.gob.ec:8081/issues/934149',
+    responsable_actual: 'DANIELA MARINA GARCIA PAREDES',
+    responsable_cargo: '',
+    ultimo_movimiento: '2026-08-21 19:07 - Archivado',
+  }
+  const result = computeEgobUpdate(process, egob)
+  assert.equal(result, null) // sin cambios: no toca el cargo
+})
