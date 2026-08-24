@@ -574,3 +574,8 @@ main { padding:30px 34px 48px;max-width:1600px;margin:auto; }
 .comment-cell { display:flex; flex-direction:column; gap:2px; max-width:280px; }
 .comment-cell span { font-size:11px; color:#31484d; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .comment-cell small { font-size:9px; color:#829397; }
+
+.card-head { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.card-head h3 { margin:0; }
+.card-edit { display:inline-flex; align-items:center; gap:5px; padding:5px 11px; border-radius:9px; border:1px solid #c9e9df; background:#e6f5f0; color:var(--teal); font-size:12px; font-weight:600; cursor:pointer; transition:.16s; }
+.card-edit:hover { background:#d5eee5; }
