@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { __test__ } from '../netlify/functions/egob-sync.mjs'
 import { computeEgobUpdate } from '../netlify/functions/egob-sync-all.mjs'
 
-const { parseIssue, mergeIssueChain, extractMovements, stripText, canonicalName, parseParents } = __test__
+const { parseIssue, mergeIssueChain, extractMovements, stripText, canonicalName, parseParents, extractCargoDirectory, lookupCargo, nameKey } = __test__
 
 // --- Reordenamiento de nombres del PDF (apellidos primero -> nombres primero) ---------
 test('0. canonicalName reordena apellidos->nombres (incluye apellidos compuestos)', () => {
@@ -226,4 +226,26 @@ test('12. Mismo responsable sin cargo nuevo: conserva el cargo (fallo transitori
   }
   const result = computeEgobUpdate(process, egob)
   assert.equal(result, null) // sin cambios: no toca el cargo
+})
+
+// --- Directorio de cargos (NOMBRE (CARGO) de watchers/destinatarios) -----------------
+test('13. extractCargoDirectory saca NOMBRE (CARGO) de watchers y de enlaces /users', () => {
+  const html = `
+    <ul class="watchers">
+      <li class="user-1735">RAUL GUSTAVO ARRIETA AGUAGALLO (AYUDANTE 3 DE SECRETARIA GENERAL) </li>
+      <li class="user-9">123 456 (999)</li>
+    </ul>
+    <a class="user active" href="/users/4528">MARCELO ISAIAS BASTIDAS PASMAY</a> (AYUDANTE DE DESARROLLO ECONOMICO Y TURISMO)`
+  const dir = extractCargoDirectory(html)
+  const map = Object.fromEntries(dir.map((d) => [d.nombre, d.cargo]))
+  assert.equal(map['RAUL GUSTAVO ARRIETA AGUAGALLO'], 'AYUDANTE 3 DE SECRETARIA GENERAL')
+  assert.equal(map['MARCELO ISAIAS BASTIDAS PASMAY'], 'AYUDANTE DE DESARROLLO ECONOMICO Y TURISMO')
+  assert.ok(!('123 456' in map)) // descarta cargos numéricos / nombres inválidos
+})
+
+test('14. nameKey casa aunque cambie el orden y los acentos; lookupCargo lo usa', () => {
+  assert.equal(nameKey('GARCÍA PAREDES DANIELA MARINA'), nameKey('Daniela Marina Garcia Paredes'))
+  const dir = [{ nombre: 'DANIELA MARINA GARCIA PAREDES', cargo: 'AYUDANTE DE GESTION 3' }]
+  assert.equal(lookupCargo(dir, 'GARCIA PAREDES DANIELA MARINA'), 'AYUDANTE DE GESTION 3')
+  assert.equal(lookupCargo(dir, 'OTRA PERSONA DISTINTA'), '')
 })

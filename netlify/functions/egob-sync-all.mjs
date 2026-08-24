@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { loginAndReadIssue } from './egob-sync.mjs'
+import { loginAndReadIssue, nameKey } from './egob-sync.mjs'
 
 const headers = {
   'content-type': 'application/json; charset=utf-8',
@@ -127,16 +127,46 @@ export default async function scheduledEgobSync() {
     audit: [],
   }
 
+  // Directorio global de cargos: parte de lo ya persistido y crece en cada corrida.
+  // Sirve para completar el cargo de un responsable cuando su propia página no lo trae
+  // (p. ej. aparece como watcher/destinatario con cargo en OTRO trámite).
+  const cargoDir = new Map() // nameKey -> { nombre, cargo }
+  const mergeDir = (pairs) => {
+    for (const p of pairs || []) {
+      const k = nameKey(p?.nombre)
+      if (k && p.cargo) cargoDir.set(k, { nombre: p.nombre, cargo: p.cargo })
+    }
+  }
+  try {
+    const { data: saved } = await supabase.from('egob_cargos').select('nombre_key,nombre,cargo')
+    for (const row of saved || []) if (row.nombre_key) cargoDir.set(row.nombre_key, { nombre: row.nombre, cargo: row.cargo })
+  } catch { /* la tabla egob_cargos puede no existir aún; el directorio se arma solo con esta corrida */ }
+
+  // PASE 1: leer eGob de todos los trámites y armar el directorio completo de cargos.
+  const pending = []
   for (const process of processes || []) {
     const issue = getIssueNumber(process)
     if (!issue) {
       summary.skipped += 1
       continue
     }
-
     summary.checked += 1
     try {
       const egob = await loginAndReadIssue(issue)
+      mergeDir(egob.cargo_directory)
+      pending.push({ process, issue, egob })
+    } catch (error) {
+      summary.errors.push({ codigo_proceso: process.codigo_proceso, issue, error: error.message || 'Error desconocido' })
+    }
+  }
+
+  // PASE 2: completar el cargo faltante con el directorio y escribir los cambios.
+  for (const { process, issue, egob } of pending) {
+    try {
+      if (!clean(egob.responsable_cargo)) {
+        const hit = cargoDir.get(nameKey(egob.responsable_actual))
+        if (hit?.cargo) egob.responsable_cargo = hit.cargo
+      }
       const result = computeEgobUpdate(process, egob)
 
       const auditRow = {
@@ -192,6 +222,12 @@ export default async function scheduledEgobSync() {
       })
     }
   }
+
+  // Persistir el directorio para que crezca entre corridas (si la tabla existe).
+  try {
+    const rows = [...cargoDir.entries()].map(([nombre_key, v]) => ({ nombre_key, nombre: v.nombre, cargo: v.cargo, updated_at: new Date().toISOString() }))
+    if (rows.length) await supabase.from('egob_cargos').upsert(rows, { onConflict: 'nombre_key' })
+  } catch { /* la tabla egob_cargos puede no existir aún */ }
 
   return new Response(JSON.stringify(summary), { status: 200, headers })
 }

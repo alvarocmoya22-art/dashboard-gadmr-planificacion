@@ -492,6 +492,9 @@ async function openSession(issue) {
 export async function loginAndReadIssue(issue) {
   const { jar, page } = await openSession(issue)
   const base = parseIssue(issue, page.html, page.url)
+  // Directorio de cargos de esta pagina (watchers/destinatarios) para completar el cargo
+  // del responsable y para alimentar el directorio global entre tramites.
+  const cargoDir = extractCargoDirectory(page.html)
 
   // Fuente primaria: PDF "Hoja de Ruta" (historial COMPLETO de toda la cadena, sin paginacion).
   try {
@@ -509,13 +512,14 @@ export async function loginAndReadIssue(issue) {
           estado: base.estado || rec.estado,
           prioridad: base.prioridad,
           responsable_actual: rec.responsable,
-          responsable_cargo: parseRoleForAssignee(stripText(page.html), rec.responsable) || base.responsable_cargo,
+          responsable_cargo: parseRoleForAssignee(stripText(page.html), rec.responsable) || lookupCargo(cargoDir, rec.responsable) || base.responsable_cargo,
           ultimo_movimiento: rec.ultimo_movimiento || base.ultimo_movimiento,
           actualizado_en: rec.actualizado_en || base.actualizado_en,
           tramites_hijos: base.tramites_hijos,
           tramites_madre: base.tramites_madre,
           tramites_revisados: [issue],
           tramites_relacionados: extractRelated(text, base.tramites_hijos, issue),
+          cargo_directory: cargoDir,
           fuente: 'recorrido_pdf',
           sincronizado_en: new Date().toISOString(),
         }
@@ -528,6 +532,8 @@ export async function loginAndReadIssue(issue) {
   const relatedIssues = await readRelatedIssues(jar, issue, base.tramites_hijos)
   const merged = mergeIssueChain(base, relatedIssues)
   merged.tramites_madre = base.tramites_madre
+  merged.cargo_directory = cargoDir
+  if (!merged.responsable_cargo) merged.responsable_cargo = lookupCargo(cargoDir, merged.responsable_actual)
   merged.tramites_relacionados = [...new Set([...(merged.tramites_revisados || []), ...(merged.tramites_hijos || [])])]
     .map((value) => String(value).replace(/\D/g, ''))
     .filter((value) => value && value !== String(issue))
@@ -661,6 +667,53 @@ function parseHojaDeRuta(text) {
 
 // Construye un roster de nombres canonicos (orden NOMBRES APELLIDOS, como el dashboard)
 // a partir de las listas de usuarios del HTML de eGob (dos formatos disponibles).
+// Directorio de cargos de la pagina: pares NOMBRE (CARGO) de las listas de
+// watchers/destinatarios (<li class="user-###">NOMBRE (CARGO)</li> y
+// <a href="/users/###">NOMBRE</a> (CARGO)). Devuelve el cargo MAS FRECUENTE por nombre.
+function extractCargoDirectory(pageHtml) {
+  const html = repairMojibake(pageHtml)
+  const counts = new Map() // nombre -> Map(cargo -> n)
+  const record = (rawName, rawCargo) => {
+    const nombre = String(rawName).replace(/&[a-z]+;/gi, ' ').replace(/\s+/g, ' ').trim().toLocaleUpperCase('es')
+    const cargo = String(rawCargo).replace(/&[a-z]+;/gi, ' ').replace(/\s+/g, ' ').trim()
+    if (nombre.split(' ').length < 2) return
+    if (!/[A-Za-zÁÉÍÓÚÑ]/.test(cargo) || /^[\d\s]+$/.test(cargo)) return
+    if (!counts.has(nombre)) counts.set(nombre, new Map())
+    const c = counts.get(nombre)
+    c.set(cargo, (c.get(cargo) || 0) + 1)
+  }
+  // <li class="user-1735">RAUL GUSTAVO ARRIETA AGUAGALLO (AYUDANTE 3 DE ...) </li>
+  for (const m of html.matchAll(/class=["']user[- ][^"']*["'][^>]*>\s*([A-ZÁÉÍÓÚÑÜ][A-ZÁÉÍÓÚÑÜ.'\s-]+?)\s*\(([^)<]{4,160})\)/gi)) record(m[1], m[2])
+  // <a ... href="/users/4528">MARCELO ISAIAS BASTIDAS PASMAY</a> (AYUDANTE DE ...)
+  for (const m of html.matchAll(/href=["']\/users\/\d+["'][^>]*>([^<]{4,80})<\/a>\s*\(([^)<]{4,160})\)/gi)) record(m[1], m[2])
+  const out = []
+  for (const [nombre, cargos] of counts) {
+    let best = '', bestN = 0
+    for (const [cargo, n] of cargos) if (n > bestN) { best = cargo; bestN = n }
+    out.push({ nombre, cargo: best })
+  }
+  return out
+}
+
+// Clave normalizada de un nombre (mayúsculas, sin acentos, palabras ordenadas)
+// para casar aunque cambie el orden apellidos/nombres o los acentos.
+export function nameKey(name) {
+  return repairMojibake(String(name || ''))
+    .toLocaleUpperCase('es')
+    .normalize('NFD').replace(/[̀-ͯ]/g, '')
+    .replace(/[^A-Z\s]/g, ' ')
+    .split(/\s+/).filter(Boolean).sort().join(' ')
+}
+
+// Busca el cargo de una persona en un directorio [{nombre,cargo}] por clave normalizada.
+function lookupCargo(directory, name) {
+  if (!Array.isArray(directory) || !name) return ''
+  const key = nameKey(name)
+  if (!key) return ''
+  for (const entry of directory) if (nameKey(entry.nombre) === key) return entry.cargo || ''
+  return ''
+}
+
 function buildNameRoster(pageHtml) {
   const text = repairMojibake(stripText(pageHtml))
   const canonical = new Map() // clave: palabras ordenadas alfabeticamente -> nombre canonico
@@ -895,4 +948,7 @@ export const __test__ = {
   parseHojaDeRuta,
   resolveRecorrido,
   parseParents,
+  extractCargoDirectory,
+  lookupCargo,
+  nameKey,
 }
