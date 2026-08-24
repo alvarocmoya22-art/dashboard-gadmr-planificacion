@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { loginAndReadIssue, nameKey } from './egob-sync.mjs'
+import { loginAndReadIssue, nameKey, readCargoDirectory } from './egob-sync.mjs'
 
 const headers = {
   'content-type': 'application/json; charset=utf-8',
@@ -143,6 +143,11 @@ export default async function scheduledEgobSync() {
   } catch { /* la tabla egob_cargos puede no existir aún; el directorio se arma solo con esta corrida */ }
 
   // PASE 1: leer eGob de todos los trámites y armar el directorio completo de cargos.
+  // El cargo de cada persona vive en el selector institucional (NOMBRE - CARGO), que aparece
+  // solo en algunas páginas (las 1200+ personas de una vez). Lo buscamos en los hijos hasta
+  // hallarlo UNA vez; luego el directorio queda completo y se persiste para próximas corridas.
+  const DIR_COMPLETE = 200
+  let dirHuntBudget = 15 // tope de lecturas de hijos solo para encontrar el directorio
   const pending = []
   for (const process of processes || []) {
     const issue = getIssueNumber(process)
@@ -154,6 +159,14 @@ export default async function scheduledEgobSync() {
     try {
       const egob = await loginAndReadIssue(issue)
       mergeDir(egob.cargo_directory)
+      if (cargoDir.size < DIR_COMPLETE && dirHuntBudget > 0 && Array.isArray(egob.tramites_hijos)) {
+        for (const child of egob.tramites_hijos) {
+          if (dirHuntBudget <= 0) break
+          dirHuntBudget -= 1
+          mergeDir(await readCargoDirectory(child))
+          if (cargoDir.size >= DIR_COMPLETE) break
+        }
+      }
       pending.push({ process, issue, egob })
     } catch (error) {
       summary.errors.push({ codigo_proceso: process.codigo_proceso, issue, error: error.message || 'Error desconocido' })

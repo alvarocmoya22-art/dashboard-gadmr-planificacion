@@ -229,10 +229,13 @@ test('12. Mismo responsable sin cargo nuevo: conserva el cargo (fallo transitori
 })
 
 // --- Directorio de cargos (NOMBRE (CARGO) de watchers/destinatarios) -----------------
-test('13. extractCargoDirectory saca NOMBRE (CARGO) de watchers y de enlaces /users', () => {
+test('13. extractCargoDirectory saca NOMBRE (CARGO) de watchers, /users, <option> y <b>', () => {
   const html = `
+    <select><option value="3475">GARCIA PAREDES DANIELA MARINA - AYUDANTE DE GESTION DE PLANIFICACION, HABITAT Y DESARROLLO URBANISTICO 3</option>
+    <option value="0">ODONTOLOGO</option></select>
     <ul class="watchers">
       <li class="user-1735">RAUL GUSTAVO ARRIETA AGUAGALLO (AYUDANTE 3 DE SECRETARIA GENERAL) </li>
+      <li class="user-3475"><b style='font-weight: 1000;'>DANIELA MARINA GARCIA PAREDES (AYUDANTE DE GESTION DE PLANIFICACION, HABITAT Y DESARROLLO URBANISTICO 3)</b> ( Archivado )</li>
       <li class="user-9">123 456 (999)</li>
     </ul>
     <a class="user active" href="/users/4528">MARCELO ISAIAS BASTIDAS PASMAY</a> (AYUDANTE DE DESARROLLO ECONOMICO Y TURISMO)`
@@ -240,6 +243,8 @@ test('13. extractCargoDirectory saca NOMBRE (CARGO) de watchers y de enlaces /us
   const map = Object.fromEntries(dir.map((d) => [d.nombre, d.cargo]))
   assert.equal(map['RAUL GUSTAVO ARRIETA AGUAGALLO'], 'AYUDANTE 3 DE SECRETARIA GENERAL')
   assert.equal(map['MARCELO ISAIAS BASTIDAS PASMAY'], 'AYUDANTE DE DESARROLLO ECONOMICO Y TURISMO')
+  // El <option> del selector institucional (NOMBRE - CARGO) y el <b> del watcher.
+  assert.equal(lookupCargo(dir, 'DANIELA MARINA GARCIA PAREDES'), 'AYUDANTE DE GESTION DE PLANIFICACION, HABITAT Y DESARROLLO URBANISTICO 3')
   assert.ok(!('123 456' in map)) // descarta cargos numéricos / nombres inválidos
 })
 

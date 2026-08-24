@@ -682,9 +682,13 @@ function extractCargoDirectory(pageHtml) {
     const c = counts.get(nombre)
     c.set(cargo, (c.get(cargo) || 0) + 1)
   }
-  // <li class="user-1735">RAUL GUSTAVO ARRIETA AGUAGALLO (AYUDANTE 3 DE ...) </li>
-  for (const m of html.matchAll(/class=["']user[- ][^"']*["'][^>]*>\s*([A-ZÁÉÍÓÚÑÜ][A-ZÁÉÍÓÚÑÜ.'\s-]+?)\s*\(([^)<]{4,160})\)/gi)) record(m[1], m[2])
-  // <a ... href="/users/4528">MARCELO ISAIAS BASTIDAS PASMAY</a> (AYUDANTE DE ...)
+  // A) Selector de usuarios de la institucion (directorio completo, el mas rico):
+  //    <option value="3475">GARCIA PAREDES DANIELA MARINA - AYUDANTE DE GESTION ...</option>
+  for (const m of html.matchAll(/<option[^>]*value=["']\d+["'][^>]*>\s*([A-ZÁÉÍÓÚÑÜ][A-ZÁÉÍÓÚÑÜ.'\s]+?)\s+-\s+([^<]{3,180})<\/option>/gi)) record(m[1], m[2])
+  // B) Watchers/destinatarios, tolerando etiquetas (<b ...>) entre la clase y el nombre:
+  //    <li class="user-3475"><b>DANIELA MARINA GARCIA PAREDES (AYUDANTE DE ...)</b>
+  for (const m of html.matchAll(/class=["']user-?[^"']*["'][^>]*>(?:\s*<[^>]*>\s*)*([A-ZÁÉÍÓÚÑÜ][A-ZÁÉÍÓÚÑÜ.'\s]+?)\s*\(([^)<]{4,160})\)/gi)) record(m[1], m[2])
+  // C) <a ... href="/users/4528">MARCELO ISAIAS BASTIDAS PASMAY</a> (AYUDANTE DE ...)
   for (const m of html.matchAll(/href=["']\/users\/\d+["'][^>]*>([^<]{4,80})<\/a>\s*\(([^)<]{4,160})\)/gi)) record(m[1], m[2])
   const out = []
   for (const [nombre, cargos] of counts) {
@@ -929,6 +933,18 @@ export async function handler(event) {
       headers,
       body: JSON.stringify({ error: error.message || 'No se pudo sincronizar eGob.' }),
     }
+  }
+}
+
+// Directorio de cargos leido de la pagina de un issue (para la sincronizacion:
+// permite recuperar el selector institucional completo desde un hijo cuando el
+// tramite propio no lo trae). Devuelve [] si la sesion falla.
+export async function readCargoDirectory(issue) {
+  try {
+    const { page } = await openSession(issue)
+    return extractCargoDirectory(page.html)
+  } catch {
+    return []
   }
 }
 
