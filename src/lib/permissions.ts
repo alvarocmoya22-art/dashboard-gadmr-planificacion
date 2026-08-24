@@ -5,11 +5,22 @@ const PROCESS_WRITER_EMAILS = [
   'coordinacion.gerencia@epmrutasderiobamba.gob.ec',
 ]
 
+// Identidades para las reglas de "Pendientes de revisión" (observación #13).
+export const SCAR_EMAIL = 'nietosj@gadmriobamba.gob.ec'
+export const JUAN_DIEGO_EMAIL = 'remachejd@gadmriobamba.gob.ec'
+
 // Operadores: pueden EDITAR (estado, avance, seguimiento), comentar y adjuntar,
 // pero NO crear ni archivar trámites.
 const PROCESS_OPERATOR_EMAILS = [
-  'nietosj@gadmriobamba.gob.ec',
+  SCAR_EMAIL,
 ]
+
+export function reviewViewerFor(email = ''): 'scar' | 'juandiego' | 'other' {
+  const e = normalizeEmail(email)
+  if (e === JUAN_DIEGO_EMAIL) return 'juandiego'
+  if (e === SCAR_EMAIL) return 'scar'
+  return 'other'
+}
 
 function normalizeEmail(email = '') {
   return email.trim().toLowerCase()

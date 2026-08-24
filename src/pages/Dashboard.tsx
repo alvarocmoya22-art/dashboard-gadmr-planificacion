@@ -5,11 +5,11 @@ import { Link } from 'react-router-dom'
 import { Card, Badge } from '../components/ui'
 import { useApp } from '../store/AppContext'
 import { getEgobIssueNumber, getEgobIssueUrl } from '../lib/egob'
-import { formatDate, normalizeText, repairMojibake, todayIso } from '../lib/utils'
+import { formatDate, normalizeText, repairMojibake } from '../lib/utils'
 
 
 export function Dashboard() {
-  const { processes, comments, attachments, openAttachment } = useApp()
+  const { processes, comments, attachments, openAttachment, isPendingReview } = useApp()
   const [portfolioSearch, setPortfolioSearch] = useState('')
 
   const latestCommentByProcess = useMemo(() => comments.reduce<Record<string, string>>((acc, comment) => {
@@ -72,10 +72,10 @@ export function Dashboard() {
   const typeMax = Math.max(...typeData.map((item) => item.value), 1)
 
 
-  // La agenda del Director muestra SOLO los trámites pendientes de revisión (fecha ≤ hoy).
+  // La agenda del Director muestra los trámites pendientes de revisión según sus reglas (#13):
+  // comentario de Scar o fin programado a una semana (y lo que marcó revisado se oculta ese día).
   const executivePortfolio = processes
-    .filter((item) => repairMojibake(item.estado?.nombre) !== 'Finalizado'
-      && Boolean(item.fecha_proxima_revision) && String(item.fecha_proxima_revision) <= todayIso())
+    .filter((item) => repairMojibake(item.estado?.nombre) !== 'Finalizado' && isPendingReview(item))
     .sort((a, b) => {
       const priorityScore = (item: typeof a) => item.semaforo === 'Rojo' ? 0 : repairMojibake(item.prioridad?.nombre) === 'Alta' ? 1 : item.semaforo === 'Amarillo' ? 2 : 3
       return priorityScore(a) - priorityScore(b) || String(a.fecha_fin_programada ?? '').localeCompare(String(b.fecha_fin_programada ?? ''))

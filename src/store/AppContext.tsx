@@ -3,6 +3,8 @@ import { toast } from 'sonner'
 import { areas as demoAreas, demoProcesses, priorities as demoPriorities, processTypes as demoTypes, statuses as demoStatuses } from '../data/tramites'
 import { deriveProcess, repairMojibake, uid } from '../lib/utils'
 import { isSupabaseConfigured, supabase } from '../lib/supabase'
+import { isPendingReview as computePending } from '../lib/review'
+import { reviewViewerFor } from '../lib/permissions'
 import type { CatalogItem, ChangeLog, Process, ProcessAttachment, ProcessComment, ProcessFormData, Role } from '../types'
 
 interface AppState {
@@ -26,6 +28,8 @@ interface AppState {
   saveProcess: (data: ProcessFormData, current?: Process) => Promise<Process | undefined>
   deleteProcess: (id: string) => Promise<void>
   markReviewed: (id: string) => Promise<void>
+  isPendingReview: (process: Process) => boolean
+  latestComment: (processId: string) => ProcessComment | undefined
   addComment: (processId: string, contenido: string) => Promise<void>
   deleteComment: (id: string) => Promise<void>
   uploadAttachment: (processId: string, file: File) => Promise<void>
@@ -89,6 +93,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   // Mapa id -> nombre para resolver el autor de comentarios/adjuntos (profiles es legible por todos).
   const profilesRef = useRef<Map<string, string>>(new Map())
   const authUserIdRef = useRef<string | null>(null)
+  // Reglas de "Pendientes de revisión" (#13): ids de Scar / Juan Diego y marcas de revisado por día.
+  const [scarId, setScarId] = useState<string | null>(null)
+  const [juanDiegoId, setJuanDiegoId] = useState<string | null>(null)
+  // reviewMarks: key = `${processId}:${userId}` -> ISO de la última revisión de esa persona.
+  const [reviewMarks, setReviewMarks] = useState<Map<string, string>>(new Map())
 
   useEffect(() => {
     async function load() {
@@ -108,11 +117,31 @@ export function AppProvider({ children }: { children: ReactNode }) {
         if (profile?.role) setRole(profile.role as Role)
         if (profile?.area_id) setUserAreaId(profile.area_id)
       }
-      // Directorio de nombres para mostrar quién dejó cada comentario/adjunto.
-      const { data: allProfiles } = await supabase.from('profiles').select('id, nombre_completo')
+      // Directorio de nombres para mostrar quién dejó cada comentario/adjunto,
+      // y resolución de los ids de Scar / Juan Diego por email (para las reglas de #13).
+      let profileRows: Array<{ id: string; nombre_completo?: string; email?: string }> = []
+      const withEmail = await supabase.from('profiles').select('id, nombre_completo, email')
+      if (withEmail.error) {
+        // La columna email puede no existir aún (migración no aplicada): degrada sin romper.
+        const basic = await supabase.from('profiles').select('id, nombre_completo')
+        profileRows = (basic.data ?? []) as typeof profileRows
+      } else {
+        profileRows = (withEmail.data ?? []) as typeof profileRows
+      }
       const nameMap = new Map<string, string>()
-      for (const p of allProfiles ?? []) if (p.id) nameMap.set(p.id, repairMojibake(p.nombre_completo || '') || 'Usuario institucional')
+      for (const p of profileRows) {
+        if (!p.id) continue
+        nameMap.set(p.id, repairMojibake(p.nombre_completo || '') || 'Usuario institucional')
+        const email = (p.email || '').trim().toLowerCase()
+        if (email === 'nietosj@gadmriobamba.gob.ec') setScarId(p.id)
+        if (email === 'remachejd@gadmriobamba.gob.ec') setJuanDiegoId(p.id)
+      }
       profilesRef.current = nameMap
+      // Marcas de "revisado" (para ocultar por el día). Tabla puede no existir aún.
+      try {
+        const { data: marks } = await supabase.from('process_review_marks').select('process_id, reviewed_by, reviewed_at')
+        if (marks) setReviewMarks(new Map(marks.map((m) => [`${m.process_id}:${m.reviewed_by}`, m.reviewed_at])))
+      } catch { /* tabla process_review_marks no existe aún */ }
       const [areaResult, typeResult, statusResult, priorityResult] = await Promise.all([
         supabase.from('areas').select('*').eq('activo', true).order('nombre'),
         supabase.from('process_types').select('*').eq('activo', true).order('nombre'),
@@ -268,13 +297,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     toast.success('Trámite archivado')
   }
 
+  // "Marcar como revisado": registra la marca del día para la persona que mira, lo que oculta
+  // el trámite de SU vista de Pendientes ese día (reaparece mañana si sigue pendiente, o antes
+  // si llega una señal nueva). No borra la fecha de próxima revisión.
   async function markReviewed(id: string) {
-    if (supabase) {
-      const { error } = await supabase.from('processes').update({ fecha_proxima_revision: null, updated_at: new Date().toISOString() }).eq('id', id)
-      if (error) throw error
+    const nowIso = new Date().toISOString()
+    const userId = authUserIdRef.current || 'demo-user'
+    if (supabase && authUserIdRef.current) {
+      // Si la tabla aún no existe (migración no aplicada), no rompas la UI: guarda solo local.
+      const { error } = await supabase
+        .from('process_review_marks')
+        .upsert({ process_id: id, reviewed_by: authUserIdRef.current, reviewed_at: nowIso }, { onConflict: 'process_id,reviewed_by' })
+      if (error && !/process_review_marks/.test(String(error.message || ''))) throw error
     }
-    setProcesses((old) => old.map((item) => item.id === id ? { ...item, fecha_proxima_revision: undefined } : item))
-    toast.success('Trámite marcado como revisado')
+    setReviewMarks((old) => new Map(old).set(`${id}:${userId}`, nowIso))
+    toast.success('Marcado como revisado por hoy')
   }
 
   async function addComment(processId: string, contenido: string) {
@@ -447,11 +484,54 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const userAreaName = areas.find((item) => item.id === userAreaId)?.nombre ?? ''
   const canAccessManagement = role === 'admin' || role === 'gerente' || userAreaName.trim().toLowerCase() === 'gerencia general'
 
+  // --- Pendientes de revisión (#13): señales por trámite ---------------------------------
+  function latestComment(processId: string): ProcessComment | undefined {
+    let best: ProcessComment | undefined
+    for (const c of comments) {
+      if (c.process_id !== processId) continue
+      if (!best || String(c.created_at) > String(best.created_at)) best = c
+    }
+    return best
+  }
+  function lastEgobChangeAt(processId: string): string | null {
+    let best: string | null = null
+    for (const l of logs) {
+      if (l.process_id !== processId || !String(l.campo || '').startsWith('egob_')) continue
+      const t = String(l.created_at)
+      if (!best || t > best) best = t
+    }
+    return best
+  }
+  function lastCommentAtBy(processId: string, userId: string | null): string | null {
+    if (!userId) return null
+    let best: string | null = null
+    for (const c of comments) {
+      if (c.process_id !== processId || c.created_by !== userId) continue
+      const t = String(c.created_at)
+      if (!best || t > best) best = t
+    }
+    return best
+  }
+  function isPendingReview(process: Process): boolean {
+    const viewer = reviewViewerFor(userEmail)
+    const finalized = repairMojibake(process.estado?.nombre) === 'Finalizado'
+    const reviewedAt = reviewMarks.get(`${process.id}:${authUserIdRef.current || 'demo-user'}`) ?? null
+    return computePending(viewer, {
+      finalized,
+      proximaRevision: process.fecha_proxima_revision ?? null,
+      finProgramada: process.fecha_fin_programada ?? null,
+      reviewedAt,
+      lastEgobChangeAt: lastEgobChangeAt(process.id),
+      lastCommentFromScarAt: lastCommentAtBy(process.id, scarId),
+      lastCommentFromJuanDiegoAt: lastCommentAtBy(process.id, juanDiegoId),
+    }, new Date().toISOString())
+  }
+
   const value = useMemo(() => ({
     processes, areas, processTypes, statuses, priorities, logs, comments, attachments, loading,
     demoMode: !isSupabaseConfigured, role, userName, userEmail, userAreaName, canAccessManagement, globalSearch, setGlobalSearch,
-    saveProcess, deleteProcess, markReviewed, addComment, deleteComment, uploadAttachment, deleteAttachment, openAttachment, importProcesses, addCatalogItem, updateCatalogItem, deleteCatalogItem,
-  }), [processes, areas, processTypes, statuses, priorities, logs, comments, attachments, loading, role, userName, userEmail, userAreaName, canAccessManagement, globalSearch])
+    saveProcess, deleteProcess, markReviewed, isPendingReview, latestComment, addComment, deleteComment, uploadAttachment, deleteAttachment, openAttachment, importProcesses, addCatalogItem, updateCatalogItem, deleteCatalogItem,
+  }), [processes, areas, processTypes, statuses, priorities, logs, comments, attachments, loading, role, userName, userEmail, userAreaName, canAccessManagement, globalSearch, reviewMarks, scarId, juanDiegoId])
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>
 }

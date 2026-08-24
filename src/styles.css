@@ -569,4 +569,8 @@ main { padding:30px 34px 48px;max-width:1600px;margin:auto; }
 .catalog-add-row .field { flex:1; margin:0; }
 .catalog-add-row .button { white-space:nowrap; }
 
-.row-actions .review-done { color: var(--teal); }
+.row-actions .review-done { color: var(--teal); display:inline-flex; align-items:center; gap:4px; width:auto; padding:0 8px; height:28px; border-radius:9px; background:#e6f5f0; border:1px solid #c9e9df; font-size:11px; font-weight:600; white-space:nowrap; }
+.row-actions .review-done:hover { background:#d5eee5; }
+.comment-cell { display:flex; flex-direction:column; gap:2px; max-width:280px; }
+.comment-cell span { font-size:11px; color:#31484d; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.comment-cell small { font-size:9px; color:#829397; }
