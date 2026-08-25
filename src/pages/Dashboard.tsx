@@ -1,16 +1,20 @@
 ﻿import { useMemo, useState } from 'react'
-import { AlertTriangle, ArrowRight, BriefcaseBusiness, CalendarClock, CheckCircle2, CircleGauge, ExternalLink, FileText, Layers3, Paperclip, Search } from 'lucide-react'
+import { AlertTriangle, ArrowRight, BriefcaseBusiness, CalendarClock, CheckCircle2, CircleGauge, ExternalLink, FileText, Layers3, Paperclip, Plus, Search } from 'lucide-react'
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts'
 import { Link } from 'react-router-dom'
-import { Card, Badge } from '../components/ui'
+import { Card, Badge, Button } from '../components/ui'
 import { useApp } from '../store/AppContext'
+import { ProcessForm } from '../components/ProcessForm'
+import { canCreateProcesses } from '../lib/permissions'
 import { getEgobIssueNumber, getEgobIssueUrl } from '../lib/egob'
 import { formatDate, normalizeText, repairMojibake } from '../lib/utils'
 
 
 export function Dashboard() {
-  const { processes, comments, attachments, openAttachment, isPendingReview, reviewComment, markReviewed } = useApp()
+  const { processes, comments, attachments, openAttachment, isPendingReview, reviewComment, markReviewed, role, userEmail } = useApp()
   const [portfolioSearch, setPortfolioSearch] = useState('')
+  const [creating, setCreating] = useState(false)
+  const canCreate = canCreateProcesses(role, userEmail)
 
   const latestCommentByProcess = useMemo(() => comments.reduce<Record<string, string>>((acc, comment) => {
     if (!acc[comment.process_id]) acc[comment.process_id] = repairMojibake(comment.contenido)
@@ -142,7 +146,7 @@ export function Dashboard() {
       </Card>
     </section>
     <section className="critical-section">
-      <div className="section-title"><div><p className="eyebrow">Agenda del Director</p><h2>Trámites pendientes de revisión</h2><span>{executivePortfolio.length} trámite{executivePortfolio.length === 1 ? '' : 's'} pendiente{executivePortfolio.length === 1 ? '' : 's'} de revisión (fecha llegada o vencida) · responsable eGob, último movimiento, comentario y adjunto cuando exista</span></div><Link to="/procesos">Ver portafolio completo <ArrowRight size={16} /></Link></div>
+      <div className="section-title"><div><p className="eyebrow">Agenda del Director</p><h2>Trámites pendientes de revisión</h2><span>{executivePortfolio.length} trámite{executivePortfolio.length === 1 ? '' : 's'} pendiente{executivePortfolio.length === 1 ? '' : 's'} de revisión (fecha llegada o vencida) · responsable eGob, último movimiento, comentario y adjunto cuando exista</span></div><div className="section-title-actions">{canCreate && <Button onClick={() => setCreating(true)}><Plus size={16} /> Nuevo trámite</Button>}<Link to="/procesos">Ver portafolio completo <ArrowRight size={16} /></Link></div></div>
       <div className="executive-search"><Search size={16} /><input value={portfolioSearch} onChange={(event) => setPortfolioSearch(event.target.value)} placeholder="Buscar trámite, código, área, responsable o eGob…" /></div>
       <div className="critical-list">{executivePreview.length ? executivePreview.map((process) => {
         const egobNumber = getEgobIssueNumber(process)
@@ -181,6 +185,7 @@ export function Dashboard() {
         </article>
       }) : <p className="all-clear">{portfolioSearch ? 'No se encontraron trámites con ese criterio.' : 'No hay trámites pendientes de revisión por ahora.'}</p>}</div>
     </section>
+    {creating && <ProcessForm onClose={() => setCreating(false)} />}
   </div>
 }
 
