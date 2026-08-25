@@ -31,7 +31,7 @@ export function hasManagementAccess(role: Role, areaName = '') {
 }
 
 export function canCreateProcesses(role: Role, email = '') {
-  return role === 'admin' || PROCESS_WRITER_EMAILS.includes(normalizeEmail(email))
+  return role === 'admin' || role === 'gerente' || PROCESS_WRITER_EMAILS.includes(normalizeEmail(email))
 }
 
 export function canExportReports(role: Role) {
