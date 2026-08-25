@@ -68,7 +68,7 @@ export function ProcessTable({ onEdit, view = 'active', processesOverride }: Pro
     return [
       helper.accessor('codigo_proceso', { header: 'Código', cell: ({ row, getValue }) => <button className="code-link" onClick={() => navigate(`/procesos/${row.original.id}`)}>{getValue()}</button> }),
       helper.accessor('nombre_proceso', { header: 'Trámite', cell: ({ row, getValue }) => <div className="process-cell"><strong>{repairMojibake(getValue())}</strong><span>{repairMojibake(row.original.responsable_principal)}</span></div> }),
-      helper.accessor((row) => row.area?.nombre ?? '', { id: 'area', header: 'Área', cell: (info) => <span className="muted-cell">{repairMojibake(info.getValue())}</span> }),
+      helper.accessor((row) => row.area?.nombre ?? '', { id: 'area', header: 'Área', cell: (info) => <span className="muted-cell area-cell" title={repairMojibake(info.getValue())}>{repairMojibake(info.getValue())}</span> }),
       helper.accessor((row) => row.estado?.nombre ?? '', { id: 'estado', header: 'Estado', cell: ({ row, getValue }) => <Badge color={row.original.estado?.color}>{repairMojibake(getValue())}</Badge> }),
       helper.accessor((row) => row.prioridad?.nombre ?? '', { id: 'prioridad', header: 'Prioridad', cell: ({ row, getValue }) => <Badge color={row.original.prioridad?.color}>{repairMojibake(getValue())}</Badge> }),
       helper.accessor('porcentaje_avance', { header: 'Avance', cell: (info) => <div className="progress-cell"><div><i style={{ width: `${info.getValue()}%` }} /></div><span>{info.getValue()}%</span></div> }),

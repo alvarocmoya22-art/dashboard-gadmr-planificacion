@@ -131,8 +131,10 @@ main { padding:30px 34px 48px;max-width:1600px;margin:auto; }
 .view-tabs { border-bottom:1px solid var(--line); }.view-tabs button { border:0;background:none;padding:10px 12px;color:#789095;font-size:11px;display:flex;gap:6px; }.view-tabs button.active { color:#0f766e;font-weight:800;border-bottom:2px solid #0f766e; }
 .table-card { background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden; }
 .table-toolbar { display:flex;gap:9px;padding:13px;border-bottom:1px solid var(--line); }.table-toolbar>.field { width:190px; }.table-search { display:flex;align-items:center;border:1px solid #d8e2de;border-radius:9px;padding-left:10px;flex:1;color:#809398; }.table-search .field { border:0;box-shadow:none; }
-.table-scroll { overflow:auto; }.table-scroll table,.preview-table table { width:100%;border-collapse:collapse;min-width:1080px; }.table-scroll th { text-align:left;background:#f7f9f8;color:#6b8085;font-size:9px;text-transform:uppercase;letter-spacing:.06em;padding:11px 12px;white-space:nowrap; }.table-scroll th svg { display:inline;margin-left:4px;vertical-align:middle; }.table-scroll td { padding:12px;border-top:1px solid #edf1ef;font-size:10px;vertical-align:middle; }.table-scroll tr:hover td { background:#fbfcfc; }
-.code-link { border:0;background:none;color:#0f766e;font-weight:800;padding:0; }.process-cell { width:285px; }.process-cell strong,.process-cell span { display:block; }.process-cell strong { font-size:10px;line-height:1.45; }.process-cell span,.muted-cell { color:#7b8f93;font-size:9px;margin-top:3px; }.muted-cell { max-width:150px;display:block; }
+.table-scroll { overflow:auto; }.table-scroll table,.preview-table table { width:100%;border-collapse:collapse;min-width:860px; }.table-scroll th { text-align:left;background:#f7f9f8;color:#6b8085;font-size:9px;text-transform:uppercase;letter-spacing:.05em;padding:8px 7px;white-space:nowrap; }.table-scroll th svg { display:inline;margin-left:3px;vertical-align:middle; }.table-scroll td { padding:8px 7px;border-top:1px solid #edf1ef;font-size:10px;vertical-align:middle; }.table-scroll tr:hover td { background:#fbfcfc; }
+.code-link { border:0;background:none;color:#0f766e;font-weight:800;padding:0; }.process-cell { width:180px;max-width:180px; }.process-cell strong,.process-cell span { display:block; }.process-cell strong { font-size:10px;line-height:1.35; }.process-cell span,.muted-cell { color:#7b8f93;font-size:9px;margin-top:3px; }.muted-cell { max-width:130px;display:block; }
+/* Área: máximo 2 líneas con puntos suspensivos (el nombre completo va en el tooltip). */
+.area-cell { max-width:120px;display:-webkit-box;-webkit-line-clamp:2;line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;line-height:1.3; }
 .progress-cell { display:flex;align-items:center;gap:7px; }.progress-cell>div { width:65px;height:5px;border-radius:9px;background:#e7eeeb;overflow:hidden; }.progress-cell i { height:100%;background:linear-gradient(90deg,#0f766e,#42ac98);display:block;border-radius:9px; }.progress-cell span { font-size:9px;font-weight:700;color:#5c7479; }
 .date-cell { display:flex;align-items:center;gap:8px;white-space:nowrap; }.row-actions { display:flex;gap:3px; }.row-actions button { border:0;background:none;padding:6px;color:#7c9094;border-radius:6px; }.row-actions button:hover { background:#edf3f1;color:#0f766e; }
 .table-footer { display:flex;justify-content:space-between;padding:11px 14px;background:#fafcfb;border-top:1px solid var(--line);font-size:9px;color:#819397; }
@@ -571,7 +573,7 @@ main { padding:30px 34px 48px;max-width:1600px;margin:auto; }
 
 .row-actions .review-done { color: var(--teal); display:inline-flex; align-items:center; gap:4px; width:auto; padding:0 8px; height:28px; border-radius:9px; background:#e6f5f0; border:1px solid #c9e9df; font-size:11px; font-weight:600; white-space:nowrap; }
 .row-actions .review-done:hover { background:#d5eee5; }
-.comment-cell { display:flex; flex-direction:column; gap:2px; max-width:280px; }
+.comment-cell { display:flex; flex-direction:column; gap:2px; max-width:180px; }
 .comment-cell span { font-size:11px; color:#31484d; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .comment-cell small { font-size:9px; color:#829397; }
 
