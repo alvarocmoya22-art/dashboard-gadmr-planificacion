@@ -30,6 +30,7 @@ interface AppState {
   markReviewed: (id: string) => Promise<void>
   isPendingReview: (process: Process) => boolean
   latestComment: (processId: string) => ProcessComment | undefined
+  reviewComment: (processId: string, agenda: 'operativa' | 'ejecutiva') => ProcessComment | undefined
   addManualRelated: (processId: string, issue: string) => Promise<void>
   removeManualRelated: (processId: string, issue: string) => Promise<void>
   addComment: (processId: string, contenido: string) => Promise<void>
@@ -516,6 +517,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
     }
     return best
   }
+  function latestCommentBy(processId: string, userId: string | null): ProcessComment | undefined {
+    if (!userId) return undefined
+    let best: ProcessComment | undefined
+    for (const c of comments) {
+      if (c.process_id !== processId || c.created_by !== userId) continue
+      if (!best || String(c.created_at) > String(best.created_at)) best = c
+    }
+    return best
+  }
+  // Comentario relevante para la agenda: en la operativa (de Scar) se muestra el del Director;
+  // en la ejecutiva (del Director) se muestra el de Scar. Si no hay de la contraparte, el último general.
+  function reviewComment(processId: string, agenda: 'operativa' | 'ejecutiva'): ProcessComment | undefined {
+    const counterpartId = agenda === 'ejecutiva' ? scarId : juanDiegoId
+    return latestCommentBy(processId, counterpartId) ?? latestComment(processId)
+  }
   function lastEgobChangeAt(processId: string): string | null {
     let best: string | null = null
     for (const l of logs) {
@@ -553,7 +569,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const value = useMemo(() => ({
     processes, areas, processTypes, statuses, priorities, logs, comments, attachments, loading,
     demoMode: !isSupabaseConfigured, role, userName, userEmail, userAreaName, canAccessManagement, globalSearch, setGlobalSearch,
-    saveProcess, deleteProcess, markReviewed, isPendingReview, latestComment, addManualRelated, removeManualRelated, addComment, deleteComment, uploadAttachment, deleteAttachment, openAttachment, importProcesses, addCatalogItem, updateCatalogItem, deleteCatalogItem,
+    saveProcess, deleteProcess, markReviewed, isPendingReview, latestComment, reviewComment, addManualRelated, removeManualRelated, addComment, deleteComment, uploadAttachment, deleteAttachment, openAttachment, importProcesses, addCatalogItem, updateCatalogItem, deleteCatalogItem,
   }), [processes, areas, processTypes, statuses, priorities, logs, comments, attachments, loading, role, userName, userEmail, userAreaName, canAccessManagement, globalSearch, reviewMarks, scarId, juanDiegoId])
 
   return <AppContext.Provider value={value}>{children}</AppContext.Provider>

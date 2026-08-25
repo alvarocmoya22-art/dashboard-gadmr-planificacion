@@ -9,7 +9,7 @@ import { formatDate, normalizeText, repairMojibake } from '../lib/utils'
 
 
 export function Dashboard() {
-  const { processes, comments, attachments, openAttachment, isPendingReview } = useApp()
+  const { processes, comments, attachments, openAttachment, isPendingReview, reviewComment } = useApp()
   const [portfolioSearch, setPortfolioSearch] = useState('')
 
   const latestCommentByProcess = useMemo(() => comments.reduce<Record<string, string>>((acc, comment) => {
@@ -147,13 +147,13 @@ export function Dashboard() {
       <div className="critical-list">{executivePreview.length ? executivePreview.map((process) => {
         const egobNumber = getEgobIssueNumber(process)
         const egobUrl = getEgobIssueUrl(process)
-        const latestComment = latestCommentByProcess[process.id]
+        const agendaComment = reviewComment(process.id, 'ejecutiva')
         const latestAttachment = latestAttachmentByProcess[process.id]
         const areaName = repairMojibake(process.area?.nombre ?? 'Sin área')
         const processName = repairMojibake(process.nombre_proceso)
         const egobOwner = repairMojibake(process.egob_responsable_actual || 'Pendiente de sincronizar')
         const egobRole = repairMojibake(process.egob_responsable_cargo || '')
-        const commentText = repairMojibake(latestComment || 'Sin comentario interno')
+        const commentText = agendaComment ? `${repairMojibake(agendaComment.contenido)} — ${repairMojibake(agendaComment.usuario || '')}` : 'Sin comentario interno'
         const movementText = repairMojibake(process.egob_ultimo_movimiento || 'Pendiente de sincronizar')
         const attachmentName = repairMojibake(latestAttachment?.nombre_archivo || 'Sin adjunto cargado')
         return <article className="critical-row" key={process.id}>

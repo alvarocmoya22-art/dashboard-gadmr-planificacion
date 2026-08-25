@@ -23,7 +23,7 @@ function isFinalized(process: Process) {
 }
 
 export function ProcessTable({ onEdit, view = 'active', processesOverride }: ProcessTableProps) {
-  const { processes, deleteProcess, markReviewed, isPendingReview, latestComment, statuses, areas, role, userEmail, globalSearch, setGlobalSearch } = useApp()
+  const { processes, deleteProcess, markReviewed, isPendingReview, reviewComment, statuses, areas, role, userEmail, globalSearch, setGlobalSearch } = useApp()
   const sourceProcesses = processesOverride ?? processes
   const [sorting, setSorting] = useState<SortingState>([])
   const [status, setStatus] = useState('')
@@ -60,7 +60,7 @@ export function ProcessTable({ onEdit, view = 'active', processesOverride }: Pro
     const reviewColumns = view === 'review' ? [
       helper.accessor('fecha_proxima_revision', { id: 'proxima', header: 'Próx. revisión', cell: ({ getValue }) => <span className="muted-cell">{getValue() ? formatDate(getValue() as string) : '—'}</span> }),
       helper.display({ id: 'ultimoComentario', header: 'Último comentario', cell: ({ row }) => {
-        const c = latestComment(row.original.id)
+        const c = reviewComment(row.original.id, 'operativa')
         if (!c) return <span className="muted-cell">—</span>
         return <div className="comment-cell"><span>{repairMojibake(c.contenido)}</span><small>{repairMojibake(c.usuario || '')} · {formatDate(c.created_at)}</small></div>
       } }),
@@ -81,7 +81,7 @@ export function ProcessTable({ onEdit, view = 'active', processesOverride }: Pro
       } }),
       helper.display({ id: 'actions', cell: ({ row }) => <div className="row-actions">{canEditProcesses(role, userEmail) && view === 'review' && <button className="review-done" onClick={() => void markReviewed(row.original.id)} title="Marcar como revisado (lo oculta de Pendientes por hoy)"><CheckCircle2 size={16} /> Revisado</button>}{canEditProcesses(role, userEmail) && <button onClick={() => onEdit(row.original)} title="Editar"><Pencil size={16} /></button>}{role === 'admin' && <button onClick={() => confirm('¿Archivar este trámite?') && void deleteProcess(row.original.id)} title="Archivar"><Trash2 size={16} /></button>}<button title="Más acciones"><MoreHorizontal size={17} /></button></div> }),
     ]
-  }, [navigate, onEdit, deleteProcess, markReviewed, latestComment, role, userEmail, view])
+  }, [navigate, onEdit, deleteProcess, markReviewed, reviewComment, role, userEmail, view])
   const table = useReactTable({
     data: filtered, columns, state: { sorting },
     onSortingChange: setSorting,
