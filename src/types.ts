@@ -47,6 +47,7 @@ export interface Process {
   egob_tramites_madre?: string[]
   egob_madre_detalle?: MadreDetalle[]
   egob_relacionados_manual?: string[]
+  egob_manual_detalle?: MadreDetalle[]
   proxima_accion?: string
   flujo?: FlujoStep[]
   objetivo?: string

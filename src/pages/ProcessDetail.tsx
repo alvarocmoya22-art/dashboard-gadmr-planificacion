@@ -44,6 +44,7 @@ export function ProcessDetail() {
     .map((value) => String(value).replace(/\D/g, ''))
     .filter((value, index, array) => value && value !== egobNumber && array.indexOf(value) === index)
   const madreDetalle = currentProcess.egob_madre_detalle ?? []
+  const manualDetalle = currentProcess.egob_manual_detalle ?? []
   const manualRelated = (currentProcess.egob_relacionados_manual ?? [])
     .map((value) => String(value).replace(/\D/g, ''))
     .filter((value, index, array) => value && array.indexOf(value) === index)
@@ -117,7 +118,15 @@ export function ProcessDetail() {
               : <p className="related-note">Detalle pendiente de sincronizar.</p>}
           </div>
         })}</div> : <p className="all-clear">Sin trámite madre en eGob.</p>}
-        {manualRelated.length > 0 && <div className="manual-related"><span className="madre-tag alt">Agregados a mano</span><div className="related-list">{manualRelated.map((num) => <span key={num} className="related-chip"><a href={`${EGOB_BASE_URL}/issues/${num}`} target="_blank" rel="noreferrer"><ExternalLink size={12} /> eGob #{num}</a>{canEdit && <button type="button" className="chip-x" title="Quitar" onClick={() => void removeManualRelated(currentProcess.id, num)}>×</button>}</span>)}</div></div>}
+        {manualRelated.length > 0 && <div className="manual-related"><span className="madre-tag alt">Agregados a mano</span><div className="madre-list">{manualRelated.map((num) => {
+          const d = manualDetalle.find((x) => String(x.issue) === num)
+          return <div className="madre-item" key={num}>
+            <div className="madre-head"><span className="madre-tag alt">Manual</span><a href={`${EGOB_BASE_URL}/issues/${num}`} target="_blank" rel="noreferrer">eGob #{num} <ExternalLink size={12} /></a>{canEdit && <button type="button" className="chip-x" title="Quitar" onClick={() => void removeManualRelated(currentProcess.id, num)}>×</button>}</div>
+            {d && (d.asunto || d.remitente || d.destinatario || d.fecha)
+              ? <dl className="madre-detail">{d.asunto && <div><dt>Asunto</dt><dd>{repairMojibake(d.asunto)}</dd></div>}{d.remitente && <div><dt>Remitente</dt><dd>{repairMojibake(d.remitente)}</dd></div>}{d.destinatario && <div><dt>Destinatario</dt><dd>{repairMojibake(d.destinatario)}</dd></div>}{d.fecha && <div><dt>Fecha</dt><dd>{d.fecha}</dd></div>}</dl>
+              : <p className="related-note">Detalle pendiente de sincronizar.</p>}
+          </div>
+        })}</div></div>}
         {canEdit && <div className="manual-add"><Input value={newRelated} onChange={(event) => setNewRelated(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') { event.preventDefault(); void addRelated() } }} placeholder="N° eGob a relacionar…" /><button type="button" className="button button-secondary" onClick={() => void addRelated()}>Agregar</button></div>}
         <p className="related-note">La madre es la "Tarea padre" en eGob (hijos e "insistos" quedan fuera). Puedes agregar otros trámites a mano.</p>
       </Card>}

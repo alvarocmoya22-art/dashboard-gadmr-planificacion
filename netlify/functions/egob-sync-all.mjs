@@ -100,6 +100,16 @@ export function computeEgobUpdate(process, egob, nowIso = new Date().toISOString
     }
   }
 
+  // Detalle de los relacionados agregados a mano.
+  if (Array.isArray(egob.manual_detalle)) {
+    const manNew = JSON.stringify(egob.manual_detalle)
+    const manOld = JSON.stringify(Array.isArray(process.egob_manual_detalle) ? process.egob_manual_detalle : [])
+    if (manNew !== manOld) {
+      payload.egob_manual_detalle = egob.manual_detalle
+      hasChanges = true
+    }
+  }
+
   if (!hasChanges) return null
 
   // Una unica notificacion por movimiento: la fila representativa de mayor prioridad.
@@ -122,7 +132,7 @@ export default async function scheduledEgobSync() {
   const supabase = getSupabaseAdmin()
   const { data: processes, error } = await supabase
     .from('processes')
-    .select('id,codigo_proceso,nombre_proceso,documento_respaldo,egob_numero,egob_url,egob_estado,egob_responsable_actual,egob_responsable_cargo,egob_ultimo_movimiento,egob_sincronizado_en,egob_tramites_relacionados,egob_tramites_madre,egob_madre_detalle')
+    .select('id,codigo_proceso,nombre_proceso,documento_respaldo,egob_numero,egob_url,egob_estado,egob_responsable_actual,egob_responsable_cargo,egob_ultimo_movimiento,egob_sincronizado_en,egob_tramites_relacionados,egob_tramites_madre,egob_madre_detalle,egob_relacionados_manual,egob_manual_detalle')
     .eq('activo', true)
     .or('egob_numero.not.is.null,documento_respaldo.not.is.null')
 
@@ -193,17 +203,23 @@ export default async function scheduledEgobSync() {
         if (hit?.cargo) egob.responsable_cargo = hit.cargo
       }
       // Detalle de la(s) madre(s) para mostrar en el frontend.
-      if (Array.isArray(egob.tramites_madre) && egob.tramites_madre.length) {
-        const detalle = []
-        for (const madre of egob.tramites_madre) {
-          const key = String(madre)
+      const detalleDe = async (numeros) => {
+        const out = []
+        for (const n of numeros) {
+          const key = String(n).replace(/\D/g, '')
+          if (!key) continue
           if (!madreCache.has(key)) madreCache.set(key, await readMadreDetalle(key))
-          detalle.push(madreCache.get(key))
+          out.push(madreCache.get(key))
         }
-        egob.madre_detalle = detalle
-      } else {
-        egob.madre_detalle = []
+        return out
       }
+      egob.madre_detalle = Array.isArray(egob.tramites_madre) && egob.tramites_madre.length
+        ? await detalleDe(egob.tramites_madre)
+        : []
+      // Detalle de los relacionados agregados a mano (mismo formato que la madre).
+      egob.manual_detalle = Array.isArray(process.egob_relacionados_manual) && process.egob_relacionados_manual.length
+        ? await detalleDe(process.egob_relacionados_manual)
+        : []
       const result = computeEgobUpdate(process, egob)
 
       const auditRow = {
@@ -230,9 +246,9 @@ export default async function scheduledEgobSync() {
 
       // Si alguna columna aun no existe en la BD (migracion no aplicada), reintenta sin esas
       // columnas en vez de fallar (la sincronizacion sigue funcionando).
-      if (updateError && /egob_sincronizado_en|egob_tramites_relacionados|egob_tramites_madre|egob_madre_detalle/.test(String(updateError.message || ''))) {
-        const { egob_sincronizado_en, egob_tramites_relacionados, egob_tramites_madre, egob_madre_detalle, ...rest } = result.payload
-        void egob_sincronizado_en; void egob_tramites_relacionados; void egob_tramites_madre; void egob_madre_detalle
+      if (updateError && /egob_sincronizado_en|egob_tramites_relacionados|egob_tramites_madre|egob_madre_detalle|egob_manual_detalle/.test(String(updateError.message || ''))) {
+        const { egob_sincronizado_en, egob_tramites_relacionados, egob_tramites_madre, egob_madre_detalle, egob_manual_detalle, ...rest } = result.payload
+        void egob_sincronizado_en; void egob_tramites_relacionados; void egob_tramites_madre; void egob_madre_detalle; void egob_manual_detalle
         ;({ error: updateError } = await supabase.from('processes').update(rest).eq('id', process.id))
       }
 

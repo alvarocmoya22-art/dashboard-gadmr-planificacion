@@ -584,6 +584,7 @@ main { padding:30px 34px 48px;max-width:1600px;margin:auto; }
 .madre-item { border:1px solid #e7edeb; border-radius:12px; padding:10px 12px; background:#fbfdfc; }
 .madre-head { display:flex; align-items:center; gap:8px; margin-bottom:6px; }
 .madre-head a { display:inline-flex; align-items:center; gap:4px; color:var(--teal); font-weight:600; font-size:12px; }
+.madre-head .chip-x { margin-left:auto; }
 .madre-tag { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:#0f766e; background:#e6f5f0; border-radius:6px; padding:2px 7px; }
 .madre-tag.alt { color:#6b4e00; background:#fdf3d8; }
 .madre-detail { display:grid; grid-template-columns:1fr; gap:4px; margin:0; }
