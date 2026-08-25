@@ -79,6 +79,10 @@ function signals(p, reviewerId) {
   }
 }
 
+// Resumen de marcas de revisión
+console.log('=== MARCAS DE REVISIÓN (process_review_marks) ===')
+console.log(`  total: ${marks.length} · de Scar: ${marks.filter((m) => m.reviewed_by === scarId).length} · del Director: ${marks.filter((m) => m.reviewed_by === jdId).length}\n`)
+
 // 3) Evidencia: trámites con comentario del Director -> deben estar en Pendientes de Scar
 console.log('=== 2) COMENTARIOS DEL DIRECTOR -> PENDIENTES DE SCAR (vista operativa) ===')
 let dirComentados = 0, dirEnScar = 0
@@ -88,7 +92,7 @@ for (const p of procs || []) {
   dirComentados += 1
   const r = isPendingReview('scar', s, now)
   if (r.pending && r.reasons.includes('comentario del Director')) dirEnScar += 1
-  console.log(`  ${r.pending ? '✅' : '❌'} ${p.codigo_proceso} · ${String(p.nombre_proceso).slice(0, 40)} · razones: [${r.reasons.join(', ') || '—'}]`)
+  console.log(`  ${r.pending ? '✅' : '❌'} ${p.codigo_proceso} · comentDir=${s.lastCommentFromJuanDiegoAt} · revScar=${s.reviewedAt || '(ninguna)'} · nueva=${Boolean(s.lastCommentFromJuanDiegoAt) && (!s.reviewedAt || s.lastCommentFromJuanDiegoAt > s.reviewedAt)} · razones:[${r.reasons.join(', ') || '—'}]`)
 }
 console.log(`  -> ${dirComentados} trámites con comentario del Director; ${dirEnScar} aparecen en Pendientes de Scar por ese motivo\n`)
 
