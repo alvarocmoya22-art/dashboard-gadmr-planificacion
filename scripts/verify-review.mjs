@@ -56,7 +56,7 @@ console.log(`  profiles con email: ${emailsConDato}/${(profiles || []).length}\n
 
 // 2) Datos para evaluar pendientes
 const { data: procs } = await supabase.from('processes')
-  .select('id, codigo_proceso, nombre_proceso, fecha_proxima_revision, fecha_fin_programada, estado:process_statuses(nombre)')
+  .select('id, codigo_proceso, nombre_proceso, egob_numero, fecha_proxima_revision, fecha_fin_programada, estado:process_statuses(nombre)')
   .eq('activo', true)
 const { data: comments } = await supabase.from('process_comments').select('process_id, created_by, created_at, contenido').order('created_at')
 const { data: logs } = await supabase.from('process_change_log').select('process_id, campo, created_at').like('campo', 'egob_%')
