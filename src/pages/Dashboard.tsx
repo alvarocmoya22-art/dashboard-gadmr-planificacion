@@ -9,7 +9,7 @@ import { formatDate, normalizeText, repairMojibake } from '../lib/utils'
 
 
 export function Dashboard() {
-  const { processes, comments, attachments, openAttachment, isPendingReview, reviewComment } = useApp()
+  const { processes, comments, attachments, openAttachment, isPendingReview, reviewComment, markReviewed } = useApp()
   const [portfolioSearch, setPortfolioSearch] = useState('')
 
   const latestCommentByProcess = useMemo(() => comments.reduce<Record<string, string>>((acc, comment) => {
@@ -174,6 +174,7 @@ export function Dashboard() {
               {egobNumber ? <span className="egob-number">eGob #{egobNumber}</span> : <span className="egob-number muted">Sin eGob</span>}
               {egobUrl ? <a className="egob-open" href={egobUrl} target="_blank" rel="noreferrer"><ExternalLink size={14} /> Abrir eGob</a> : null}
               {latestAttachment ? <button className="attachment-open" type="button" onClick={() => void openAttachment(latestAttachment)}><FileText size={14} /> Abrir adjunto</button> : null}
+              <button className="review-done" type="button" onClick={() => void markReviewed(process.id)} title="Marcar como revisado (lo oculta de tu agenda por hoy)"><CheckCircle2 size={14} /> Revisado</button>
             </div>
           </div>
           <Link className="row-detail-link" to={`/procesos/${process.id}`} aria-label={`Ver detalle de ${processName}`}><ArrowRight size={17} /></Link>
