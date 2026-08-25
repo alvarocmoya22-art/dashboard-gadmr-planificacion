@@ -11,7 +11,7 @@ import type { Process } from '../types'
 // buscar, filtrar por área/estado, editar/eliminar y crear.
 export function Operativa() {
   const { role, userEmail } = useApp()
-  const [view, setView] = useState<'active' | 'review'>('active')
+  const [view, setView] = useState<'active' | 'review'>('review')
   // undefined = cerrado · null = nuevo trámite · Process = editar ese trámite
   const [formProcess, setFormProcess] = useState<Process | null | undefined>(undefined)
   const canCreate = canCreateProcesses(role, userEmail)
