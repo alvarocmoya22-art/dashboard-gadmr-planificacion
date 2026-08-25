@@ -1,7 +1,7 @@
 ﻿import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { toast } from 'sonner'
-import { ArrowLeft, Building2, CalendarDays, CheckCircle2, Clock3, Download, ExternalLink, FileText, History, MessageSquareText, Paperclip, Pencil, SlidersHorizontal, Trash2, UserRound } from 'lucide-react'
+import { ArrowLeft, Building2, CalendarDays, CheckCircle2, Clock3, Download, ExternalLink, FileText, MessageSquareText, Paperclip, Pencil, SlidersHorizontal, Trash2, UserRound } from 'lucide-react'
 import { Badge, Button, Card, EmptyState, Field, Input, Select, Textarea } from '../components/ui'
 import { ProcessForm } from '../components/ProcessForm'
 import { useApp } from '../store/AppContext'
@@ -21,7 +21,7 @@ function initials(name: string): string {
 export function ProcessDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { processes, logs, comments, attachments, addComment, deleteComment, uploadAttachment, deleteAttachment, openAttachment, addManualRelated, removeManualRelated, role, userEmail, userName, canAccessManagement } = useApp()
+  const { processes, comments, attachments, addComment, deleteComment, uploadAttachment, deleteAttachment, openAttachment, addManualRelated, removeManualRelated, role, userEmail, userName, canAccessManagement } = useApp()
   const [commentText, setCommentText] = useState('')
   const [uploading, setUploading] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -35,7 +35,6 @@ export function ProcessDetail() {
   const goBack = () => { if (window.history.length > 1) navigate(-1); else navigate(backFallback) }
   const canEdit = canEditProcesses(role, userEmail)
 
-  const processLogs = logs.filter((item) => item.process_id === currentProcess.id)
   const processComments = comments.filter((item) => item.process_id === currentProcess.id)
   const processAttachments = attachments.filter((item) => item.process_id === currentProcess.id)
   const egobNumber = getEgobIssueNumber(currentProcess)
@@ -123,7 +122,6 @@ export function ProcessDetail() {
         <p className="related-note">La madre es la "Tarea padre" en eGob (hijos e "insistos" quedan fuera). Puedes agregar otros trámites a mano.</p>
       </Card>}
       {canEdit && <OperativeEdit process={currentProcess} />}
-      <Card className="info-card"><h3><History size={18} /> Historial de cambios</h3>{processLogs.length ? processLogs.map((log) => <div className="history-row" key={log.id}><i /><div><strong>{repairMojibake(log.campo)}</strong><p>“{repairMojibake(log.valor_anterior ?? '')}” → “{repairMojibake(log.valor_nuevo ?? '')}”</p><small>{log.usuario} · {new Date(log.created_at).toLocaleString('es-EC')}</small></div></div>) : <p className="all-clear">No hay cambios posteriores registrados en esta sesión.</p>}</Card>
     </div><aside className="detail-side"><Card><h3><MessageSquareText size={18} /> Conversación</h3><p>Hilo interno del trámite en Supabase. Cada mensaje muestra quién lo dejó. No se envía al eGob.</p><div className="chat-thread">{processComments.length ? processComments.map((comment) => { const autor = comment.usuario || 'Usuario institucional'; const mine = autor === userName; return <article key={comment.id} className={`chat-msg ${mine ? 'chat-mine' : ''}`}><span className="chat-avatar" aria-hidden="true">{initials(autor)}</span><div className="chat-body"><div className="chat-meta"><strong>{mine ? 'Tú' : repairMojibake(autor)}</strong><small>{new Date(comment.created_at).toLocaleString('es-EC')}</small></div><p>{repairMojibake(comment.contenido)}</p></div><button className="icon-danger chat-del" type="button" title="Eliminar mensaje" onClick={() => void removeComment(comment.id)}><Trash2 size={14} /></button></article> }) : <p className="all-clear">Aún no hay mensajes. Inicia la conversación.</p>}</div><textarea className="field" value={commentText} onChange={(event) => setCommentText(event.target.value)} placeholder="Escribir mensaje…" /><button className="button button-primary" onClick={() => void publishComment()}>Enviar mensaje</button></Card><Card><h3><Paperclip size={18} /> Adjuntos</h3><label className={`upload-zone ${uploading ? 'upload-zone-busy' : ''}`}>{uploading ? 'Cargando adjunto…' : 'Haz clic para seleccionar un archivo'}<input type="file" onChange={(event) => void pickAttachment(event.target.files?.[0])} disabled={uploading} /></label><div className="attachment-list">{processAttachments.length ? processAttachments.map((attachment) => <div className="attachment-row" key={attachment.id}><button type="button" onClick={() => void downloadAttachment(attachment)}><FileText size={15} /><span>{repairMojibake(attachment.nombre_archivo)}</span><Download size={14} /></button><button className="icon-danger" type="button" title="Eliminar adjunto" onClick={() => void removeAttachment(attachment)}><Trash2 size={14} /></button></div>) : <p className="all-clear">Aún no hay adjuntos cargados.</p>}</div></Card></aside></div>
     {editing && <ProcessForm process={currentProcess} onClose={() => setEditing(false)} />}
   </div>
