@@ -108,3 +108,21 @@ for (const p of procs || []) {
   console.log(`  ${r.pending ? '✅' : '❌'} ${p.codigo_proceso} · ${String(p.nombre_proceso).slice(0, 40)} · razones: [${r.reasons.join(', ') || '—'}]`)
 }
 console.log(`  -> ${scarComentados} trámites con comentario de Scar; ${scarEnDir} aparecen en Pendientes del Director por ese motivo`)
+
+// 5) SIMULACIÓN: un comentario NUEVO del Director (ahora) sobre un trámite que Scar ya revisó
+//    -> debe volver a Pendientes de Scar por "comentario del Director".
+console.log('\n=== 4) SIMULACIÓN: comentario NUEVO del Director sobre un trámite ya revisado por Scar ===')
+const candidato = (procs || []).find((p) => (p.estado?.nombre || '') !== 'Finalizado' && markOf(p.id, scarId))
+if (!candidato) {
+  console.log('  (no hay trámite no-finalizado con revisión de Scar para simular)')
+} else {
+  const base = signals(candidato, scarId)
+  const antes = isPendingReview('scar', base, now)
+  const conComentarioNuevo = { ...base, lastCommentFromJuanDiegoAt: now } // el Director comenta AHORA
+  const despues = isPendingReview('scar', conComentarioNuevo, now)
+  console.log(`  Trámite: ${candidato.codigo_proceso} · ${String(candidato.nombre_proceso).slice(0, 40)}`)
+  console.log(`  Revisión previa de Scar: ${base.reviewedAt}`)
+  console.log(`  ANTES (sin comentario nuevo): pending=${antes.pending} razones=[${antes.reasons.join(', ') || '—'}]`)
+  console.log(`  DESPUÉS (Director comenta ahora): pending=${despues.pending} razones=[${despues.reasons.join(', ')}]`)
+  console.log(`  >> ${despues.pending && despues.reasons.includes('comentario del Director') ? '✅ El comentario NUEVO del Director SÍ lo manda a Pendientes de Scar' : '❌ NO funcionó'}`)
+}
