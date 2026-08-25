@@ -639,7 +639,13 @@ export async function diagnoseJson(issue) {
 // Cada fila: ÁREA · FECHA · ACCIÓN · De · Para · No.días("Fecha límite …") · Comentario.
 // Los nombres vienen en orden APELLIDOS NOMBRES (al reves del dashboard) y fragmentados por lineas.
 
-const RUTA_ACCIONES = 'Reasignado|Adjunto|Archivado|Nueva respuesta|Documento enviado|Documento generado|Sumillado|Finalizado|Respondido|Respuesta|Anulado|Restaurado|Informado'
+const RUTA_ACCIONES = 'Reasignado|Adjunto|Archivado|Nueva respuesta|Documento enviado|Documento generado|Registro|Sumillado|Finalizado|Respondido|Respuesta|Anulado|Restaurado|Informado'
+
+// Acciones que CAMBIAN a quién está el trámite (tienen destinatario "Para").
+// "Registro" en el PDF corresponde a "Documento Enviado a X" en eGob.
+const OWNER_ACCIONES = new Set(['Reasignado', 'Registro', 'Documento enviado'])
+const isOwnerAccion = (accion) => OWNER_ACCIONES.has(accion)
+const OWNER_LABEL = { Reasignado: 'Reasignación', Registro: 'Documento enviado', 'Documento enviado': 'Documento enviado' }
 
 function normalizeRuta(text) {
   return repairMojibake(text)
@@ -800,6 +806,7 @@ const ACCION_LABEL = {
   Archivado: 'Archivado',
   'Nueva respuesta': 'Nueva respuesta',
   'Documento enviado': 'Documento enviado',
+  Registro: 'Documento enviado',
   'Documento generado': 'Documento generado',
   Sumillado: 'Sumillado',
   Finalizado: 'Finalizado',
@@ -817,9 +824,9 @@ function resolveRecorrido(rows, roster) {
   // Conjunto de nombres conocidos (orden apellidos-primero) para cortar De/Para con fiabilidad:
   //  - filas de un solo nombre (Adjunto, Archivado, Respuesta, …)
   //  - auto-reasignaciones "X X" (mismo nombre repetido) -> la mitad es un nombre limpio
-  const known = new Set(rows.filter((r) => r.accion !== 'Reasignado' && okLen(r.blob)).map((r) => r.blob))
+  const known = new Set(rows.filter((r) => !isOwnerAccion(r.accion) && okLen(r.blob)).map((r) => r.blob))
   for (const r of rows) {
-    if (r.accion !== 'Reasignado') continue
+    if (!isOwnerAccion(r.accion)) continue
     const w = r.blob.split(' ')
     if (w.length % 2 === 0) {
       const half = w.length / 2
@@ -828,28 +835,29 @@ function resolveRecorrido(rows, roster) {
     }
   }
   // Primera pasada: separa lo que pueda y agrega De/Para al roster de conocidos.
-  const firstPass = rows.filter((r) => r.accion === 'Reasignado').map((r) => splitDePara(r.blob, known))
+  const firstPass = rows.filter((r) => isOwnerAccion(r.accion)).map((r) => splitDePara(r.blob, known))
   for (const s of firstPass) { if (s.de && okLen(s.de)) known.add(s.de); if (s.para && okLen(s.para)) known.add(s.para) }
 
   const events = rows.map((row, i) => {
     let para = ''
-    if (row.accion === 'Reasignado') {
+    if (isOwnerAccion(row.accion)) {
       const split = splitDePara(row.blob, known)
       para = split.para ? canonicalName(split.para, roster) : ''
     }
     return { ...row, para, ts: rutaTimestamp(row.date), order: i }
   })
   const byDate = [...events].sort((a, b) => a.ts - b.ts || a.order - b.order)
-  const lastReassign = [...byDate].reverse().find((e) => e.accion === 'Reasignado' && e.para)
+  // El responsable es el "Para" del último evento de dueño (Reasignado o Documento enviado).
+  const lastOwner = [...byDate].reverse().find((e) => isOwnerAccion(e.accion) && e.para)
   const lastRow = byDate.at(-1)
   const formatRow = (e) => {
     if (!e) return ''
-    const label = e.accion === 'Reasignado' && e.para ? `Reasignación a ${e.para}` : (ACCION_LABEL[e.accion] || e.accion)
+    const label = e.para && isOwnerAccion(e.accion) ? `${OWNER_LABEL[e.accion] || 'Enviado'} a ${e.para}` : (ACCION_LABEL[e.accion] || e.accion)
     return `${e.date} - ${label}`
   }
   return {
-    responsable: lastReassign?.para || '',
-    date: lastReassign?.date || '',
+    responsable: lastOwner?.para || '',
+    date: lastOwner?.date || '',
     estado: lastRow ? (ACCION_LABEL[lastRow.accion] || lastRow.accion) : '',
     ultimo_movimiento: formatRow(lastRow),
     actualizado_en: lastRow?.date || '',

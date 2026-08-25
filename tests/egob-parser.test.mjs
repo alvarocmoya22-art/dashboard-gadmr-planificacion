@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { __test__ } from '../netlify/functions/egob-sync.mjs'
 import { computeEgobUpdate } from '../netlify/functions/egob-sync-all.mjs'
 
-const { parseIssue, mergeIssueChain, extractMovements, stripText, canonicalName, parseParents, extractCargoDirectory, lookupCargo, nameKey } = __test__
+const { parseIssue, mergeIssueChain, extractMovements, stripText, canonicalName, parseParents, extractCargoDirectory, lookupCargo, nameKey, resolveRecorrido } = __test__
 
 // --- Reordenamiento de nombres del PDF (apellidos primero -> nombres primero) ---------
 test('0. canonicalName reordena apellidos->nombres (incluye apellidos compuestos)', () => {
@@ -253,4 +253,15 @@ test('14. nameKey casa aunque cambie el orden y los acentos; lookupCargo lo usa'
   const dir = [{ nombre: 'DANIELA MARINA GARCIA PAREDES', cargo: 'AYUDANTE DE GESTION 3' }]
   assert.equal(lookupCargo(dir, 'GARCIA PAREDES DANIELA MARINA'), 'AYUDANTE DE GESTION 3')
   assert.equal(lookupCargo(dir, 'OTRA PERSONA DISTINTA'), '')
+})
+
+test('15. resolveRecorrido: "Documento enviado" (Registro) también cambia al responsable', () => {
+  const rows = [
+    { date: '2026-08-21 17:48', accion: 'Reasignado', blob: 'REMACHE RIVERA JUAN DIEGO GARCIA PAREDES DANIELA MARINA', index: 0 },
+    { date: '2026-08-21 17:56', accion: 'Respuesta', blob: 'GARCIA PAREDES DANIELA MARINA', index: 1 },
+    { date: '2026-08-22 08:18', accion: 'Registro', blob: 'REMACHE RIVERA JUAN DIEGO VALLEJO MANCERO RAMIRO ALONSO', index: 2 },
+  ]
+  const res = resolveRecorrido(rows, null)
+  assert.equal(res.responsable, 'RAMIRO ALONSO VALLEJO MANCERO') // el envío es posterior a la reasignación
+  assert.match(res.ultimo_movimiento, /Documento enviado a RAMIRO ALONSO VALLEJO MANCERO/)
 })
