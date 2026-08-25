@@ -2,17 +2,19 @@
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
 import type { Process } from '../types'
-import { formatDate } from '../lib/utils'
+import { formatDate, repairMojibake } from '../lib/utils'
+
+const fix = (value?: string | null) => repairMojibake(value ?? '')
 
 const rows = (processes: Process[]) => processes.map((item) => ({
-  Código: item.codigo_proceso, Área: item.area?.nombre, Tipo: item.tipo?.nombre, Trámite: item.nombre_proceso,
-  'Responsable principal': item.responsable_principal, Inicio: item.fecha_inicio, 'Fin programado': item.fecha_fin_programada,
-  'Fin real': item.fecha_fin_real, Estado: item.estado?.nombre, Prioridad: item.prioridad?.nombre,
+  Código: item.codigo_proceso, Área: fix(item.area?.nombre), Tipo: fix(item.tipo?.nombre), Trámite: fix(item.nombre_proceso),
+  'Responsable principal': fix(item.responsable_principal), Inicio: item.fecha_inicio, 'Fin programado': item.fecha_fin_programada,
+  'Fin real': item.fecha_fin_real, Estado: fix(item.estado?.nombre), Prioridad: fix(item.prioridad?.nombre),
   'Avance %': item.porcentaje_avance, Semáforo: item.semaforo, 'Días retraso': item.dias_retraso,
-  'Dependencia externa': item.dependencia_externa, 'Próxima acción': item.proxima_accion,
-  'Nro. eGob': item.egob_numero, 'URL eGob': item.egob_url, 'Estado eGob': item.egob_estado,
-  'Actualmente con': item.egob_responsable_actual,
-  'Último movimiento eGob': item.egob_ultimo_movimiento,
+  'Dependencia externa': fix(item.dependencia_externa), 'Próxima acción': fix(item.proxima_accion),
+  'Nro. eGob': item.egob_numero, 'URL eGob': item.egob_url, 'Estado eGob': fix(item.egob_estado),
+  'Actualmente con': fix(item.egob_responsable_actual), 'Cargo eGob': fix(item.egob_responsable_cargo),
+  'Último movimiento eGob': fix(item.egob_ultimo_movimiento),
 }))
 
 export function exportProcessesToXlsx(processes: Process[], fileName = 'matriz-tramites-gadmr.xlsx') {
