@@ -126,3 +126,16 @@ if (!candidato) {
   console.log(`  DESPUÉS (Director comenta ahora): pending=${despues.pending} razones=[${despues.reasons.join(', ')}]`)
   console.log(`  >> ${despues.pending && despues.reasons.includes('comentario del Director') ? '✅ El comentario NUEVO del Director SÍ lo manda a Pendientes de Scar' : '❌ NO funcionó'}`)
 }
+
+// 6) Qué mostrará "Último comentario" en la EJECUTIVA (debe ser el de Scar, no el del Director)
+console.log('\n=== 5) "ÚLTIMO COMENTARIO" en la ejecutiva (contraparte = Scar) ===')
+const commentsByProc = (comments || [])
+for (const num of ['934149', '1169873']) {
+  const p = (procs || []).find((x) => String(x.egob_numero || '').replace(/\D/g, '') === num)
+  if (!p) { console.log(`  #${num}: (no encontrado)`); continue }
+  const deScar = commentsByProc.filter((c) => c.process_id === p.id && c.created_by === scarId).map((c) => c.contenido).at(-1)
+  const general = commentsByProc.filter((c) => c.process_id === p.id).map((c) => c.contenido).at(-1)
+  console.log(`  #${num} · ${p.codigo_proceso}`)
+  console.log(`     ejecutiva mostrará: ${deScar ? `"${String(deScar).slice(0, 60)}" (de Scar) ✅` : 'Sin comentario del operador (Scar no comentó)'}`)
+  console.log(`     (último general era: "${String(general || '').slice(0, 60)}")`)
+}

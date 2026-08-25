@@ -153,7 +153,7 @@ export function Dashboard() {
         const processName = repairMojibake(process.nombre_proceso)
         const egobOwner = repairMojibake(process.egob_responsable_actual || 'Pendiente de sincronizar')
         const egobRole = repairMojibake(process.egob_responsable_cargo || '')
-        const commentText = agendaComment ? `${repairMojibake(agendaComment.contenido)} — ${repairMojibake(agendaComment.usuario || '')}` : 'Sin comentario interno'
+        const commentText = agendaComment ? `${repairMojibake(agendaComment.contenido)} — ${repairMojibake(agendaComment.usuario || '')}` : 'Sin comentario del operador'
         const movementText = repairMojibake(process.egob_ultimo_movimiento || 'Pendiente de sincronizar')
         const attachmentName = repairMojibake(latestAttachment?.nombre_archivo || 'Sin adjunto cargado')
         return <article className="critical-row" key={process.id}>

@@ -527,10 +527,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     return best
   }
   // Comentario relevante para la agenda: en la operativa (de Scar) se muestra el del Director;
-  // en la ejecutiva (del Director) se muestra el de Scar. Si no hay de la contraparte, el último general.
+  // en la ejecutiva (del Director) se muestra el de Scar. SOLO el de la contraparte (sin caer al
+  // propio), para que en cada vista no aparezcan los comentarios de uno mismo.
   function reviewComment(processId: string, agenda: 'operativa' | 'ejecutiva'): ProcessComment | undefined {
     const counterpartId = agenda === 'ejecutiva' ? scarId : juanDiegoId
-    return latestCommentBy(processId, counterpartId) ?? latestComment(processId)
+    return latestCommentBy(processId, counterpartId)
   }
   function lastEgobChangeAt(processId: string): string | null {
     let best: string | null = null
